@@ -1,0 +1,10 @@
+{
+  "lockfileVersion": 1,
+  "dependencies": {
+    "zod": {
+      "version": "3.18.0",
+      "resolved": "https://registry.npmjs.org/zod/-/zod-3.18.0.tgz",
+      "integrity": "sha512-gwTm8RfUCe8l9rDwN5r2A17DkAa8Ez4Yl4yXqc5VqeGaXaJahzYYXbTwvhroZi0SNBqTwh/bKm2N0mpCzuw4bA=="
+    }
+  }
+}
