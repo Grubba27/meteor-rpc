@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Config, ReturnMethod } from "./types"
+import { Config, ReturnMethod } from "../types"
 import { isThenable } from './utils/isThenable'
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 

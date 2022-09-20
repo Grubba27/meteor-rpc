@@ -1,6 +1,6 @@
 Package.describe({
   name: 'grubba:rpc',
-  version: '0.2.1',
+  version: '0.2.2',
   summary: 'Evolved RPC Methods for Meteor',
   documentation: 'README.md'
 });

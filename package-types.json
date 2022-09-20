@@ -1,3 +1,3 @@
 {
-  "typesEntry": "lib/types/index.d.ts"
+  "typesEntry": "types/index.ts"
 }

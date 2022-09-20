@@ -1,7 +1,7 @@
 import { Meteor } from "meteor/meteor";
 import { z } from "zod"
-import { createPublication } from "../createPublication";
-import { createMethod } from "../createMethod";
+import { createPublication } from "../lib/createPublication";
+import { createMethod } from "../lib/createMethod";
 
 type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
   config: {

@@ -1,4 +1,4 @@
-import { Config } from "./types";
+import { Config } from "../types";
 import { z } from "zod";
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Subscription as MeteorSubscription } from 'meteor/meteor'
