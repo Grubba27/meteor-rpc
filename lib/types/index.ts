@@ -1,5 +1,7 @@
-import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
+import { Meteor } from "meteor/meteor";
 import { z } from "zod"
+import { createMethod } from "./createMethod.ts";
+import { createPublication } from "./createMethod.ts";
 
 type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
   config: {
@@ -45,8 +47,12 @@ interface SubscriptionCallbacks {
   onStop?: (err?: any) => void,
   onReady?: () => void
 }
+type CreateMethod = typeof createMethod;
+type CreatePublication = typeof createPublication;
 
 export {
+  CreateMethod,
+  CreatePublication,
   ReturnMethod,
   ReturnSubscription,
   Config,

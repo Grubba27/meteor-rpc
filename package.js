@@ -1,6 +1,6 @@
 Package.describe({
   name: 'grubba:rpc',
-  version: '0.1.0',
+  version: '0.2.0',
   summary: 'Evolved RPC Methods for Meteor',
   documentation: 'README.md'
 });
@@ -20,6 +20,7 @@ Package.onUse(function (api) {
   api.imply('dynamic-import');
   api.use('typescript');
   api.use('ddp-rate-limiter');
+  api.use('zodern:types@1.0.0');
   api.mainModule('server-main.ts', [
     "server"
   ]);
