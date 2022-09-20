@@ -47,12 +47,12 @@ interface SubscriptionCallbacks {
   onStop?: (err?: any) => void,
   onReady?: () => void
 }
-type CreateMethod = typeof createMethod;
-type CreatePublication = typeof createPublication;
+type createMethod = typeof createMethod;
+type createPublication = typeof createPublication;
 
 export {
-  CreateMethod,
-  CreatePublication,
+  createMethod,
+  createPublication,
   ReturnMethod,
   ReturnSubscription,
   Config,
