@@ -5,41 +5,31 @@ import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
 
 export const createPublication =
   <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []>
-  (name: Name, schema: Schema, run: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result, config: Config<UnwrappedArgs, Result> = {
-    methodHooks: {
-      onErrorResolve: [],
-      onAfterResolve: [],
-      onBeforeResolve: []
+  (name: Name, schema: Schema, run: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+    const hooks = {
+      onBeforeResolve: config?.hooks?.onBeforeResolve || [],
+      onAfterResolve: config?.hooks?.onAfterResolve || [],
+      onErrorResolve: config?.hooks?.onErrorResolve || [],
     }
-  }) => {
     if (Meteor.isServer) {
       Meteor.publish(name, function (args: unknown[]) {
         if (schema == null && args.length > 0) {
           throw new Error('Unexpected arguments')
         }
         const parsed: UnwrappedArgs = schema.parse(args)
-        if (config?.methodHooks?.onBeforeResolve) {
-          config
-            .methodHooks
-            .onBeforeResolve
-            .map((fn) => fn(args, parsed))
-        }
+        hooks
+          .onBeforeResolve
+          .map((fn) => fn(args, parsed))
         try {
           const result = run.call(this, ...args as UnwrappedArgs)
-          if (config?.methodHooks?.onAfterResolve) {
-            config
-              .methodHooks
-              .onAfterResolve
-              .map(fn => fn(args, parsed, result));
-          }
+          hooks
+            .onAfterResolve
+            .map(fn => fn(args, parsed, result));
           return result
         } catch (e) {
-          if (config?.methodHooks?.onErrorResolve) {
-            config
-              .methodHooks
-              .onErrorResolve
-              .map(fn => fn(e, args, parsed))
-          }
+          hooks
+            .onErrorResolve
+            .map(fn => fn(e, args, parsed))
         }
       })
     }
@@ -54,23 +44,18 @@ export const createPublication =
 
     subscribe.addBeforeResolveHook =
       (fn: (raw: unknown, parsed: UnwrappedArgs) => void) => {
-        if (config?.methodHooks?.onBeforeResolve) {
-          config.methodHooks.onBeforeResolve.push(fn);
-        }
+        hooks.onBeforeResolve.push(fn);
       }
 
     subscribe.addAfterResolveHook =
       (fn: (raw: unknown, parsed: UnwrappedArgs, result: Result) => void) => {
-        if (config?.methodHooks?.onAfterResolve) {
-          config.methodHooks.onAfterResolve.push(fn);
-        }
+        hooks.onAfterResolve.push(fn);
+
       }
 
     subscribe.addErrorResolveHook =
-      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void)  => {
-        if (config?.methodHooks?.onErrorResolve) {
-          config.methodHooks.onErrorResolve.push(fn);
-        }
+      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void) => {
+        hooks.onErrorResolve.push(fn);
       }
 
     subscribe.config = { ...config, name, schema }

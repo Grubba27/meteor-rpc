@@ -7,43 +7,33 @@ import { Meteor } from "meteor/meteor";
 
 export const createMethod =
   <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []>
-  (name: Name, schema: Schema, run: (...args: UnwrappedArgs) => Result, config: Config<UnwrappedArgs, Result> = {
-    methodHooks: {
-      onErrorResolve: [],
-      onAfterResolve: [],
-      onBeforeResolve: []
+  (name: Name, schema: Schema, run: (...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+    const hooks = {
+      onBeforeResolve: config?.hooks?.onBeforeResolve || [],
+      onAfterResolve: config?.hooks?.onAfterResolve || [],
+      onErrorResolve: config?.hooks?.onErrorResolve || [],
     }
-  }) => {
     if (Meteor.isServer) {
       Meteor.methods({
         [name](data: unknown[]) {
           const parsed: UnwrappedArgs = schema.parse(data);
-          if (config?.methodHooks?.onBeforeResolve) {
-            config
-              .methodHooks
-              .onBeforeResolve
-              .map((fn) => fn(data, parsed))
-          }
+          hooks
+            .onBeforeResolve
+            .map((fn) => fn(data, parsed))
           try {
             const result: Result = run(...parsed)
-            if (config?.methodHooks?.onAfterResolve) {
-              config
-                .methodHooks
-                .onAfterResolve
-                .map(fn => fn(data, parsed, result));
-            }
+            hooks
+              .onAfterResolve
+              .map(fn => fn(data, parsed, result));
             if (isThenable(result)) {
               return (Promise as any).await(result);
             } else {
               return result;
             }
           } catch (e: Meteor.Error | Error | unknown) {
-            if (config?.methodHooks?.onErrorResolve) {
-              config
-                .methodHooks
+              hooks
                 .onErrorResolve
                 .map(fn => fn(e, data, parsed));
-            }
           }
         }
       });
@@ -66,23 +56,17 @@ export const createMethod =
 
     call.addBeforeResolveHook =
       (fn: (raw: unknown, parsed: UnwrappedArgs) => void) => {
-        if (config?.methodHooks?.onBeforeResolve) {
-          config.methodHooks.onBeforeResolve.push(fn);
-        }
+        hooks.onBeforeResolve.push(fn);
       }
 
     call.addAfterResolveHook =
       (fn: (raw: unknown, parsed: UnwrappedArgs, result: Result) => void) => {
-        if (config?.methodHooks?.onAfterResolve) {
-          config.methodHooks.onAfterResolve.push(fn);
-        }
+        hooks.onAfterResolve.push(fn);
       }
 
     call.addErrorResolveHook =
-      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void)  => {
-        if (config?.methodHooks?.onErrorResolve) {
-          config.methodHooks.onErrorResolve.push(fn);
-        }
+      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void) => {
+        hooks.onErrorResolve.push(fn);
       }
 
     call.config = { ...config, name, schema }

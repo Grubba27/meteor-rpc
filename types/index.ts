@@ -58,7 +58,7 @@ type Config<S, T> = {
     interval: number,
     limit: number
   },
-  methodHooks?: {
+  hooks?: {
     onBeforeResolve?: Array<(raw: unknown, parsed: S,) => void>;
     onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
     onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void>;
