@@ -7,7 +7,6 @@ they are:
 
 - crateMethod
 - createPublication
-- createRouter
 
 ## How to use it?
 
