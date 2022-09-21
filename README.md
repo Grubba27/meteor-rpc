@@ -7,7 +7,6 @@ they are:
 
 - crateMethod
 - createPublication
-- createRouter
 
 ## How to use it?
 
@@ -29,12 +28,15 @@ createMethod accepts 4 arguments:
 - config (optional): object with the following properties:
 
 ```typescript
-type Config = {
-  rateLimit: { limit: number, interval: number },
-  methodHooks: {
-    beforeResolve: (args, err: null | Meteor.Error, result: T) => void,
-    afterResolve: (args, result: T) => void,
-    onErrorResolve: (err: Meteor.Error, result: T) => void,
+type Config<S, T> = {
+  rateLimit?: {
+    interval: number,
+    limit: number
+  },
+  methodHooks?: {
+    onBeforeResolve?: Array<(raw: unknown, parsed: S,) => void>;
+    onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
+    onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void>;
   }
 }
 ```
@@ -59,12 +61,15 @@ createPublication accepts 4 arguments:
 _note that subscription returns the subscription handler the same way as Meteor.publish_
 
 ```typescript
-type Config = {
-  rateLimit: { limit: number, interval: number },
-  methodHooks: {
-    beforeResolve: (args, err: null | Meteor.Error, result: T) => void,
-    afterResolve: (args, result: T) => void,
-    onErrorResolve: (err: Meteor.Error, result: T) => void,
+type Config<S, T> = {
+  rateLimit?: {
+    interval: number,
+    limit: number
+  },
+  methodHooks?: {
+    onBeforeResolve?: Array<(raw: unknown, parsed: S,) => void>;
+    onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
+    onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void>;
   }
 }
 ```
