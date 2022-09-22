@@ -23,7 +23,7 @@ _example of use_
 createMethod accepts 4 arguments:
 
 - name: string
-- schema: ZodSchema (validator) must be a zod.tuple
+- schema: ZodSchema (validator)
 - handler (optional): function that receives the arguments of the method and returns the result
 - config (optional): object with the following properties:
 
@@ -44,7 +44,7 @@ type Config<S, T> = {
 ### createPublication
 
 ```typescript
-  const publication = createPublication('findRooms', z.tuple([z.object({level: z.number()})]), ({level}) => Rooms.find({level: level}));
+  const publication = createPublication('findRooms', z.object({level: z.number()}), ({level}) => Rooms.find({level: level}));
   const result = publication({level: 1}, (rooms) => console.log(rooms));
 //                                            ˆ? subscription 
 
@@ -54,7 +54,7 @@ _example of use_
 createPublication accepts 4 arguments:
 
 - name: string
-- schema: ZodSchema (validator) must be a zod.tuple
+- schema: ZodSchema (validator)
 - handler (optional): function that is being published
 - config (optional): object with the following properties:
 
