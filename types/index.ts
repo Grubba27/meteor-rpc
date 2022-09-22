@@ -1,19 +1,19 @@
 import { Meteor } from "meteor/meteor";
 import { z } from "zod"
 
-type BeforeHook<Schema extends z.ZodTuple | z.ZodTypeAny> =
+type BeforeHook<Schema extends z.ZodUndefined | z.ZodTypeAny> =
   (fn: (raw: unknown, parsed: z.infer<Schema>) => void) => void;
 
-type AfterHook<Schema extends z.ZodTuple | z.ZodTypeAny, Result> =
+type AfterHook<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
   (fn: (raw: unknown, parsed: z.infer<Schema>, result: Result) => void) => void;
 
-type ErrorHook<Schema extends z.ZodTuple | z.ZodTypeAny> =
+type ErrorHook<Schema extends z.ZodUndefined | z.ZodTypeAny> =
   (fn: (error: unknown, raw: unknown, parsed: z.infer<Schema>) => void) => void;
 
-type Resolver<Schema extends z.ZodTuple | z.ZodTypeAny, Result> =
-  (newResolver: (...args: z.infer<Schema>) => Result) => void;
+type Resolver<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
+  (newResolver: (args: z.input<Schema>) => Result) => void;
 
-type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []> = {
+type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]> = {
   config: {
     name: Name;
     schema: Schema,
@@ -22,9 +22,9 @@ type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny,
       limit: number
     },
     methodHooks?: {
-      onBeforeResolve?: Array<(raw: unknown, parsed: UnwrappedArgs) => void>;
-      onAfterResolve?: Array<(raw: unknown, parsed: UnwrappedArgs, result: Result) => void>;
-      onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void>;
+      onBeforeResolve?: Array<(raw: unknown, parsed: z.input<Schema>) => void>;
+      onAfterResolve?: Array<(raw: unknown, parsed: z.input<Schema>, result: Result) => void>;
+      onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void>;
     }
   };
   addBeforeResolveHook: BeforeHook<Schema>;
@@ -35,7 +35,7 @@ type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny,
 
   expect: <T>() => ReturnMethod<Name, Schema, T>
 
-  <T>(...args: UnwrappedArgs): Promise<Result> & Promise<T>;
+  <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 }
 
 type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
@@ -47,9 +47,9 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
       limit: number
     },
     methodHooks?: {
-      onBeforeResolve?: Array<(args?: unknown, parsed?: UnwrappedArgs) => void>;
-      onAfterResolve?: Array<(args?: UnwrappedArgs, result?: Result) => void>;
-      onErrorResolve?: Array<(err?: Meteor.Error | Error | unknown, raw?: unknown, parsed?: UnwrappedArgs) => void>;
+      onBeforeResolve?: Array<(args?: unknown, parsed?: z.input<Schema>) => void>;
+      onAfterResolve?: Array<(args?: z.input<Schema>, result?: Result) => void>;
+      onErrorResolve?: Array<(err?: Meteor.Error | Error | unknown, raw?: unknown, parsed?: z.input<Schema>) => void>;
     }
   };
   addBeforeResolveHook: BeforeHook<Schema>;
@@ -60,7 +60,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
 
   expect: <T>() => ReturnSubscription<Name, Schema, T>
 
-  (...args: UnwrappedArgs): Meteor.SubscriptionHandle
+  (args: z.input<Schema>): Meteor.SubscriptionHandle
 }
 type Maybe<T> = T | null | undefined | unknown;
 type Config<S, T> = {

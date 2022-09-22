@@ -6,8 +6,8 @@ import { Meteor } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
 
 export const createMethod =
-  <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []>
-  (name: Name, schema: Schema, resolver?: (...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined  ? [] : [z.input<Schema>]>
+  (name: Name, schema: Schema, resolver?: (args: z.input<Schema>) => Result, config?: Config<z.input<Schema>, Result>) => {
     const hooks = {
       onBeforeResolve: config?.hooks?.onBeforeResolve || [],
       onAfterResolve: config?.hooks?.onAfterResolve || [],
@@ -15,8 +15,9 @@ export const createMethod =
     }
     if (Meteor.isServer) {
       Meteor.methods({
-        [name](data: unknown[]) {
-          const parsed: UnwrappedArgs = schema.parse(data);
+        [name](data: unknown) {
+
+          const parsed: z.output<Schema> = schema.parse(data);
           runHook(hooks.onBeforeResolve, data, parsed);
 
           if (resolver === undefined) {
@@ -24,7 +25,7 @@ export const createMethod =
           }
 
           try {
-            const result: Result = resolver(...parsed)
+            const result: Result = resolver(parsed)
             runHook(hooks.onAfterResolve, data, parsed, result);
             if (isThenable(result)) {
               return (Promise as any).await(result);
@@ -41,7 +42,7 @@ export const createMethod =
       }
     }
 
-    function call(...args: UnwrappedArgs): Promise<Result> {
+    function call(args?: z.input<Schema>): Promise<Result> {
       return new Promise<Result>((resolve, reject) => {
         Meteor.call(name, args, (err: null | Meteor.Error, result: Result) => {
           if (err) {
@@ -54,22 +55,22 @@ export const createMethod =
     }
 
     call.addBeforeResolveHook =
-      (fn: (raw: unknown, parsed: UnwrappedArgs) => void) => {
+      (fn: (raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onBeforeResolve.push(fn);
       }
 
     call.addAfterResolveHook =
-      (fn: (raw: unknown, parsed: UnwrappedArgs, result: Result) => void) => {
+      (fn: (raw: unknown, parsed: z.input<Schema>, result: Result) => void) => {
         hooks.onAfterResolve.push(fn);
       }
 
     call.addErrorResolveHook =
-      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void) => {
+      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onErrorResolve.push(fn);
       }
 
     call.setResolver =
-      (newResolver: (...args: UnwrappedArgs) => Result) => {
+      (newResolver: (args: z.input<Schema>) => Result) => {
         resolver = newResolver
       };
 

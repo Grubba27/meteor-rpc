@@ -5,8 +5,8 @@ import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
 import { runHook } from "./utils/runHook";
 
 export const createPublication =
-  <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []>
-  (name: Name, schema: Schema, resolver?: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]>
+  (name: Name, schema: Schema, resolver?: (this: MeteorSubscription, args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
     const hooks = {
       onBeforeResolve: config?.hooks?.onBeforeResolve || [],
       onAfterResolve: config?.hooks?.onAfterResolve || [],
@@ -17,7 +17,7 @@ export const createPublication =
         if (schema == null && args.length > 0) {
           throw new Error('Unexpected arguments')
         }
-        const parsed: UnwrappedArgs = schema.parse(args)
+        const parsed: z.output<Schema> = schema.parse(args)
 
 
         runHook(hooks.onBeforeResolve, args, parsed);
@@ -26,7 +26,7 @@ export const createPublication =
         }
 
         try {
-          const result = resolver.call(this, ...args as UnwrappedArgs)
+          const result = resolver.call(this, args as UnwrappedArgs)
           runHook(hooks.onAfterResolve, args, parsed, result);
           return result
         } catch (e) {
@@ -39,28 +39,28 @@ export const createPublication =
       RateLimiterConfig("subscription", name, config.rateLimit);
     }
 
-    function subscribe(...args: UnwrappedArgs) {
-      return Meteor.subscribe(name, ...args)
+    function subscribe(args: z.input<Schema>) {
+      return Meteor.subscribe(name,  args)
     }
 
     subscribe.addBeforeResolveHook =
-      (fn: (raw: unknown, parsed: UnwrappedArgs) => void) => {
+      (fn: (raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onBeforeResolve.push(fn);
       }
 
     subscribe.addAfterResolveHook =
-      (fn: (raw: unknown, parsed: UnwrappedArgs, result: Result) => void) => {
+      (fn: (raw: unknown, parsed: z.input<Schema>, result: Result) => void) => {
         hooks.onAfterResolve.push(fn);
 
       }
 
     subscribe.addErrorResolveHook =
-      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void) => {
+      (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onErrorResolve.push(fn);
       }
 
     subscribe.setResolver =
-      (newResolver: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result) => {
+      (newResolver: (this: MeteorSubscription, args: z.input<Schema>) => Result) => {
       resolver = newResolver
     }
 

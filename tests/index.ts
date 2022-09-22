@@ -19,20 +19,27 @@ Meteor.isServer && Tinytest.addAsync('rpc - text', async function (test) {
 
 Meteor.isServer && Tinytest.addAsync('rpc - sum', async function (test) {
   const id = new Date().toISOString()
-  const test1 = createMethod(`${ id }.sum`, z.tuple([z.number(), z.number()]), (a1, a2) => a1 + a2);
-  const result = test1(1, 1);
+  const test1 = createMethod(`${ id }.sum`, z.array(z.number(), z.number()), ([a1, a2]) => a1 + a2);
+  const result = test1([1, 1]);
   test.equal(await result, 2);
 })
 
+
+Meteor.isServer && Tinytest.addAsync('rpc - identity', async function (test) {
+  const id = new Date().toISOString()
+  const test1 = createMethod(`${ id }.identity`, z.number(), (a1) => a1 );
+  const result = test1(1);
+  test.equal(await result, 1);
+})
 Meteor.isServer && Tinytest.addAsync('rpc - join str', async function (test) {
   const id = new Date().toISOString()
   const test1 = createMethod(
     `${ id }.sum`,
-    z.tuple([z.object({ foo: z.string(), bar: z.string() })]),
+    z.object({ foo: z.string(), bar: z.string() }),
     ({ foo, bar }) => foo + bar,
     {
       hooks: {
-        onAfterResolve: [(raw, [{ foo, bar }], result) => {
+        onAfterResolve: [(raw, { foo, bar }, result) => {
           test.equal(result, 'foobar')
           test.equal(foo, 'foo')
           test.equal(bar, 'bar')
@@ -40,11 +47,11 @@ Meteor.isServer && Tinytest.addAsync('rpc - join str', async function (test) {
       }
     });
 
-  test1.addBeforeResolveHook((raw, [{ foo, bar }]) => {
+  test1.addBeforeResolveHook((raw, { foo, bar }) => {
     test.equal(foo, 'foo')
     test.equal(bar, 'bar')
   })
-  test1.addAfterResolveHook((raw, [{ foo, bar }], result) => {
+  test1.addAfterResolveHook((raw, { foo, bar }, result) => {
     test.equal(result, 'foobar')
     test.equal(foo, 'foo')
     test.equal(bar, 'bar')
@@ -83,7 +90,7 @@ Meteor.isServer && Tinytest.addAsync('rpc - err', async function (test) {
 })
 Meteor.isServer && Tinytest.addAsync('rpc - add resolver later', async function (test) {
   const id = new Date().toISOString()
-  const math = z.tuple([z.object({ n1: z.number(), n2: z.number() })]);
+  const math = z.object({ n1: z.number(), n2: z.number() });
   const fn = createMethod(`${ id }.fn`, math).expect<number>()
 
 
@@ -93,7 +100,7 @@ Meteor.isServer && Tinytest.addAsync('rpc - add resolver later', async function 
 })
 
 Meteor.isServer && Tinytest.addAsync('rpc - full test', async function (test) {
-  const nameValidator = z.tuple([z.object({ first: z.string(), last: z.string() })]);
+  const nameValidator = z.object({ first: z.string(), last: z.string() });
   const getFullName = createMethod('some', nameValidator, ({first, last}) => {
     return `${first} ${last}`
   })
