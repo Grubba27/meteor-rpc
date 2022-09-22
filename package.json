@@ -1,6 +1,6 @@
 {
   "name": "grubba-rpc",
-  "private": true,
+  "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
     "@types/meteor": "^2.7.1",
@@ -11,5 +11,6 @@
     "check-types": "npm install && tsc && tsd ./tests",
     "postcheck-types": "npm prune --prod"
   },
+  "version": "0.4.1",
   "license": "MIT"
 }
