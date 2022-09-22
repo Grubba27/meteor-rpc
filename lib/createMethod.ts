@@ -78,17 +78,11 @@ export const createMethod =
         resolver = newResolver
       };
 
-    call.expect = <T>(): ReturnMethod<Name, Schema, T> => {
-      const futureResolver: (...args: UnwrappedArgs) => T = resolver as unknown as (...args: UnwrappedArgs) => T
-      const futureConfig = config as unknown as Config<UnwrappedArgs, T>
-      // TODO: think of a better way to do this
-      // @ts-ignore
-      delete Meteor.server.method_handlers[name]
-      return createMethod<Name, Schema, T>(name, schema, futureResolver, futureConfig) as ReturnMethod<Name, Schema, T>
-    }
-
-
     call.config = { ...config, name, schema }
+
+    call.expect = <T extends Result>(): ReturnMethod<Name, Schema, Result> => {
+      return call as ReturnMethod<Name, Schema, Result>
+    }
 
     return call as ReturnMethod<Name, Schema, Result>;
   }
