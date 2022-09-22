@@ -2,6 +2,7 @@ import { Config, ReturnSubscription } from "../types";
 import { z } from "zod";
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
+import { runHook } from "./utils/runHook";
 
 export const createPublication =
   <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []>
@@ -17,24 +18,19 @@ export const createPublication =
           throw new Error('Unexpected arguments')
         }
         const parsed: UnwrappedArgs = schema.parse(args)
-        hooks
-          .onBeforeResolve
-          .map((fn) => fn(args, parsed))
 
+
+        runHook(hooks.onBeforeResolve, args, parsed);
         if (resolver === undefined) {
           throw new Error(`Method ${name} is not implemented please provide the resolver function or use setResolver`)
         }
 
         try {
           const result = resolver.call(this, ...args as UnwrappedArgs)
-          hooks
-            .onAfterResolve
-            .map(fn => fn(args, parsed, result));
+          runHook(hooks.onAfterResolve, args, parsed, result);
           return result
         } catch (e) {
-          hooks
-            .onErrorResolve
-            .map(fn => fn(e, args, parsed))
+          runHook(hooks.onErrorResolve, e, args, parsed);
         }
       })
     }
@@ -70,5 +66,8 @@ export const createPublication =
 
     subscribe.config = { ...config, name, schema }
 
+    subscribe.expect = <T extends Result>(): ReturnSubscription<Name, Schema, Result> => {
+      return subscribe as ReturnSubscription<Name, Schema, Result>
+    }
     return subscribe as ReturnSubscription<Name, Schema, Result>
   }

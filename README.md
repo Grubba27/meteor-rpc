@@ -23,8 +23,8 @@ _example of use_
 createMethod accepts 4 arguments:
 
 - name: string
-- schema: ZodSchema (validator)
-- handler: function that receives the arguments of the method and returns the result
+- schema: ZodSchema (validator) must be a zod.tuple
+- handler (optional): function that receives the arguments of the method and returns the result
 - config (optional): object with the following properties:
 
 ```typescript
@@ -54,8 +54,8 @@ _example of use_
 createPublication accepts 4 arguments:
 
 - name: string
-- schema: ZodSchema (validator)
-- handler: function that is being published
+- schema: ZodSchema (validator) must be a zod.tuple
+- handler (optional): function that is being published
 - config (optional): object with the following properties:
 
 _note that subscription returns the subscription handler the same way as Meteor.publish_

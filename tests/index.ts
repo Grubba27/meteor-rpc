@@ -70,6 +70,12 @@ Meteor.isServer && Tinytest.addAsync('rpc - err', async function (test) {
       }
     });
 
+  err.addErrorResolveHook((err) => {
+    test.throws(() => {
+      throw err
+    }, 'err');
+  })
+
   try {
     await err(1)
   } catch (e) {
@@ -80,7 +86,17 @@ Meteor.isServer && Tinytest.addAsync('rpc - add resolver later', async function 
   const math = z.tuple([z.object({ n1: z.number(), n2: z.number() })]);
   const fn = createMethod(`${ id }.fn`, math).expect<number>()
 
-  fn.setResolver(({ n1, n2 }) => n1 + n2)
-  const result = await fn({ n1: 1, n2: 2 })
+
+  fn.setResolver(({n1 , n2}) => n1 + n2)
+  const result = await fn({n1: 1, n2: 2})
   test.equal(result, 3)
+})
+
+Meteor.isServer && Tinytest.addAsync('rpc - full test', async function (test) {
+  const nameValidator = z.tuple([z.object({ first: z.string(), last: z.string() })]);
+  const getFullName = createMethod('some', nameValidator, ({first, last}) => {
+    return `${first} ${last}`
+  })
+  const d = await getFullName({last: 'last', first: 'first'})
+  test.equal(d , 'first last')
 })

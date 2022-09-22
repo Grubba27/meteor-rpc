@@ -3,6 +3,7 @@ import { Config, ReturnMethod } from "../types"
 import { isThenable } from './utils/isThenable'
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor } from "meteor/meteor";
+import { runHook } from "./utils/runHook";
 
 export const createMethod =
   <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []>
@@ -16,9 +17,7 @@ export const createMethod =
       Meteor.methods({
         [name](data: unknown[]) {
           const parsed: UnwrappedArgs = schema.parse(data);
-          hooks
-            .onBeforeResolve
-            .map((fn) => fn(data, parsed))
+          runHook(hooks.onBeforeResolve, data, parsed);
 
           if (resolver === undefined) {
             throw new Error(`Method ${ name } is not implemented please provide the resolver function or use setResolver`)
@@ -26,18 +25,14 @@ export const createMethod =
 
           try {
             const result: Result = resolver(...parsed)
-            hooks
-              .onAfterResolve
-              .map(fn => fn(data, parsed, result));
+            runHook(hooks.onAfterResolve, data, parsed, result);
             if (isThenable(result)) {
               return (Promise as any).await(result);
             } else {
               return result;
             }
           } catch (e: Meteor.Error | Error | unknown) {
-            hooks
-              .onErrorResolve
-              .map(fn => fn(e, data, parsed));
+            runHook(hooks.onErrorResolve, e, data, parsed);
           }
         }
       });

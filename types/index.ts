@@ -57,6 +57,9 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
   addErrorResolveHook: ErrorHook<Schema>;
 
   setResolver: Resolver<Schema, Result>;
+
+  expect: <T>() => ReturnSubscription<Name, Schema, T>
+
   (...args: UnwrappedArgs): Meteor.SubscriptionHandle
 }
 type Maybe<T> = T | null | undefined | unknown;
