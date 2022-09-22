@@ -10,8 +10,10 @@ type AfterHook<Schema extends z.ZodTuple | z.ZodTypeAny, Result> =
 type ErrorHook<Schema extends z.ZodTuple | z.ZodTypeAny> =
   (fn: (error: unknown, raw: unknown, parsed: z.infer<Schema>) => void) => void;
 
-type ReturnMethod
-  <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []> = {
+type Resolver<Schema extends z.ZodTuple | z.ZodTypeAny, Result> =
+  (newResolver: (...args: z.infer<Schema>) => Result) => void;
+
+type ReturnMethod<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTypeAny ? z.infer<Schema> : []> = {
   config: {
     name: Name;
     schema: Schema,
@@ -29,7 +31,11 @@ type ReturnMethod
   addAfterResolveHook: AfterHook<Schema, Result>;
   addErrorResolveHook: ErrorHook<Schema>;
 
-  (...args: UnwrappedArgs): Promise<Result>
+  setResolver: Resolver<Schema, Result>;
+
+  expect: <T>() => ReturnMethod<Name, Schema, T>
+
+  <T>(...args: UnwrappedArgs): Promise<Result> & Promise<T>;
 }
 
 type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
@@ -50,6 +56,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
   addAfterResolveHook: AfterHook<Schema, Result>;
   addErrorResolveHook: ErrorHook<Schema>;
 
+  setResolver: Resolver<Schema, Result>;
   (...args: UnwrappedArgs): Meteor.SubscriptionHandle
 }
 type Maybe<T> = T | null | undefined | unknown;

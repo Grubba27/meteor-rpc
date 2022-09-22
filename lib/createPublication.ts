@@ -5,7 +5,7 @@ import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
 
 export const createPublication =
   <Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []>
-  (name: Name, schema: Schema, run: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+  (name: Name, schema: Schema, resolver?: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
     const hooks = {
       onBeforeResolve: config?.hooks?.onBeforeResolve || [],
       onAfterResolve: config?.hooks?.onAfterResolve || [],
@@ -20,8 +20,13 @@ export const createPublication =
         hooks
           .onBeforeResolve
           .map((fn) => fn(args, parsed))
+
+        if (resolver === undefined) {
+          throw new Error(`Method ${name} is not implemented please provide the resolver function or use setResolver`)
+        }
+
         try {
-          const result = run.call(this, ...args as UnwrappedArgs)
+          const result = resolver.call(this, ...args as UnwrappedArgs)
           hooks
             .onAfterResolve
             .map(fn => fn(args, parsed, result));
@@ -57,6 +62,11 @@ export const createPublication =
       (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: UnwrappedArgs) => void) => {
         hooks.onErrorResolve.push(fn);
       }
+
+    subscribe.setResolver =
+      (newResolver: (this: MeteorSubscription, ...args: UnwrappedArgs) => Result) => {
+      resolver = newResolver
+    }
 
     subscribe.config = { ...config, name, schema }
 

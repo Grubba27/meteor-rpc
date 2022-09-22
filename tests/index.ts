@@ -32,7 +32,7 @@ Meteor.isServer && Tinytest.addAsync('rpc - join str', async function (test) {
     ({ foo, bar }) => foo + bar,
     {
       hooks: {
-        onAfterResolve: [(raw, [{foo, bar}], result) => {
+        onAfterResolve: [(raw, [{ foo, bar }], result) => {
           test.equal(result, 'foobar')
           test.equal(foo, 'foo')
           test.equal(bar, 'bar')
@@ -40,11 +40,11 @@ Meteor.isServer && Tinytest.addAsync('rpc - join str', async function (test) {
       }
     });
 
-  test1.addBeforeResolveHook((raw, [{foo, bar}]) => {
+  test1.addBeforeResolveHook((raw, [{ foo, bar }]) => {
     test.equal(foo, 'foo')
     test.equal(bar, 'bar')
   })
-  test1.addAfterResolveHook((raw, [{foo, bar}], result) => {
+  test1.addAfterResolveHook((raw, [{ foo, bar }], result) => {
     test.equal(result, 'foobar')
     test.equal(foo, 'foo')
     test.equal(bar, 'bar')
@@ -70,5 +70,17 @@ Meteor.isServer && Tinytest.addAsync('rpc - err', async function (test) {
       }
     });
 
-  try {await err(1)} catch (e) {}
+  try {
+    await err(1)
+  } catch (e) {
+  }
+})
+Meteor.isServer && Tinytest.addAsync('rpc - add resolver later', async function (test) {
+  const id = new Date().toISOString()
+  const math = z.tuple([z.object({ n1: z.number(), n2: z.number() })]);
+  const fn = createMethod(`${ id }.fn`, math).expect<number>()
+
+  fn.setResolver(({ n1, n2 }) => n1 + n2)
+  const result = await fn({ n1: 1, n2: 2 })
+  test.equal(result, 3)
 })
