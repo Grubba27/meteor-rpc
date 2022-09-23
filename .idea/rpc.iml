@@ -6,6 +6,9 @@
       <excludeFolder url="file://$MODULE_DIR$/.tmp" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
       <excludeFolder url="file://$MODULE_DIR$/examples/simpletasks/.meteor/local" />
+      <excludeFolder url="file://$MODULE_DIR$/.npm/package/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/__types/lib" />
+      <excludeFolder url="file://$MODULE_DIR$/__types/types" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
