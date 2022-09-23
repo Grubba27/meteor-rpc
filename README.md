@@ -8,6 +8,13 @@ they are:
 - crateMethod
 - createPublication
 
+## Hot to download it?
+
+```bash
+meteor add grubba:rpc
+meteor npm i grubba-rpc
+meteor npm i zod
+```
 ## How to use it?
 
 ### createMethod
