@@ -5,6 +5,13 @@ import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
 
+/**
+ * Creates a method that can be called from the client, or from the server
+ * @param name {string} name of the method similar to the name of Meteor.method
+ * @param schema Zod schema to validate the arguments
+ * @param resolver resolver function to run the method
+ * @param config config object to set the rate limit and hooks
+ */
 export const createMethod =
   <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined  ? [] : [z.input<Schema>]>
   (name: Name, schema: Schema, resolver?: (args: z.input<Schema>) => Result, config?: Config<z.input<Schema>, Result>) => {
@@ -54,21 +61,38 @@ export const createMethod =
       });
     }
 
+
+    /**
+     * Runs before the resolver function with the given arguments
+     * @function
+     */
     call.addBeforeResolveHook =
       (fn: (raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onBeforeResolve.push(fn);
       }
 
+    /**
+     * Runs after the resolver function with the given arguments and result
+     * @function
+     */
     call.addAfterResolveHook =
       (fn: (raw: unknown, parsed: z.input<Schema>, result: Result) => void) => {
         hooks.onAfterResolve.push(fn);
       }
 
+    /**
+     * Runs when the resolver function throws an error with the given arguments and error
+     * @function
+     */
     call.addErrorResolveHook =
       (fn: (err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void) => {
         hooks.onErrorResolve.push(fn);
       }
 
+    /**
+     * Sets the resolver function. It can be used if you do not want to bundle your backend code with the client
+     * @function
+     */
     call.setResolver =
       (newResolver: (args: z.input<Schema>) => Result) => {
         resolver = newResolver
@@ -76,6 +100,11 @@ export const createMethod =
 
     call.config = { ...config, name, schema }
 
+    /**
+     * Sets the type expectations for the return of resolver function.
+     * Also known as Result
+     * @function
+     */
     call.expect = <T extends Result>(): ReturnMethod<Name, Schema, Result> => {
       return call as ReturnMethod<Name, Schema, Result>
     }

@@ -15,13 +15,15 @@ meteor add grubba:rpc
 meteor npm i grubba-rpc
 meteor npm i zod
 ```
+
 ## How to use it?
 
 ### createMethod
 
 ```typescript
-  const test1 = createMethod('name', z.any(), () => 'str');
-  const result = await test1();
+
+const test1 = createMethod('name', z.any(), () => 'str');
+const result = await test1();
 //    ˆ? is string and their value is 'str'
 ```
 
@@ -40,7 +42,7 @@ type Config<S, T> = {
     interval: number,
     limit: number
   },
-  methodHooks?: {
+  hooks?: {
     onBeforeResolve?: Array<(raw: unknown, parsed: S,) => void>;
     onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
     onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void>;
@@ -51,11 +53,12 @@ type Config<S, T> = {
 ### createPublication
 
 ```typescript
-  const publication = createPublication('findRooms', z.object({level: z.number()}), ({level}) => Rooms.find({level: level}));
-  const result = publication({level: 1}, (rooms) => console.log(rooms));
+  const publication = createPublication('findRooms', z.object({ level: z.number() }), ({ level }) => Rooms.find({ level: level }));
+const result = publication({ level: 1 }, (rooms) => console.log(rooms));
 //                                            ˆ? subscription 
 
 ```
+
 _example of use_
 
 createPublication accepts 4 arguments:
@@ -73,10 +76,88 @@ type Config<S, T> = {
     interval: number,
     limit: number
   },
-  methodHooks?: {
+  hooks?: {
     onBeforeResolve?: Array<(raw: unknown, parsed: S,) => void>;
     onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
     onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void>;
   }
 }
 ```
+
+### Advanced usage
+
+you can take advantage of the hooks to add custom logic to your methods and publications
+
+```typescript
+
+const fn = createMethod('name', z.any(), () => 'str', {
+  hooks: {
+    onBeforeResolve: [
+      (raw, parsed) => {
+        console.log('before resolve', raw, parsed);
+      }
+    ],
+    onAfterResolve: [
+      (raw, parsed, result) => {
+        console.log('after resolve', raw, parsed, result);
+      }
+    ],
+    onErrorResolve: [
+      (err, raw, parsed) => {
+        console.log('error resolve', err, raw, parsed);
+      }
+    ]
+  }
+});
+// valid ways as well
+fn.addErrorResolveHook((err, raw, parsed) => {
+  console.log('error resolve', err, raw, parsed);
+});
+fn.addBeforeResolveHook((raw, parsed) => {
+  console.log('before resolve', raw, parsed);
+});
+fn.addAfterResolveHook((raw, parsed, result) => {
+  console.log('after resolve', raw, parsed, result);
+});
+const result = await fn();
+```
+
+### Using code-splitting
+
+check this example that illustrates this 'secure way' of using code-splitting
+```typescript
+
+import { createMethod } from 'grubba-rpc'
+import { z } from "zod";
+
+const DescriptionValidator = z.object({ description: z.string() });
+
+// tasks.mutations.ts
+// it expects the return type to be a void
+export const insert = createMethod('task.insert', DescriptionValidator).expect<void>();
+
+// ---------
+
+// tasks.methods.ts
+import { insert } from './tasks.mutations.ts'
+insertTask = ({ description }) => {
+  TasksCollection.insert({
+    description,
+    userId: Meteor.userId(),
+    createdAt: new Date(),
+  });
+};
+
+insert.setResolver(insertTask);
+
+// ---------
+
+
+// client.ts
+import { insert } from './tasks.mutations.ts'
+insert({ description: 'test' });
+//^? it return void and it will run
+// if resolver is not set it will throw an error
+
+```
+
