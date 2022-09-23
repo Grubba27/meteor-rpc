@@ -27,12 +27,31 @@ type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodType
       onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void>;
     }
   };
+  /**
+   * Runs before the resolver function with the given arguments
+   * @function
+   */
   addBeforeResolveHook: BeforeHook<Schema>;
+  /**
+   * Runs after the resolver function with the given arguments and result
+   * @function
+   */
   addAfterResolveHook: AfterHook<Schema, Result>;
+  /**
+   * Runs when the resolver function throws an error with the given arguments and error
+   * @function
+   */
   addErrorResolveHook: ErrorHook<Schema>;
-
+  /**
+   * Sets the resolver function. It can be used if you do not want to bundle your backend code with the client
+   * @function
+   */
   setResolver: Resolver<Schema, Result>;
-
+  /**
+   * Sets the type expectations for the return of resolver function.
+   * Also known as Result
+   * @function
+   */
   expect: <T>() => ReturnMethod<Name, Schema, T>
 
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
@@ -52,12 +71,31 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
       onErrorResolve?: Array<(err?: Meteor.Error | Error | unknown, raw?: unknown, parsed?: z.input<Schema>) => void>;
     }
   };
+  /**
+   * Runs before the resolver function with the given arguments
+   * @function
+   */
   addBeforeResolveHook: BeforeHook<Schema>;
+  /**
+   * Runs after the resolver function with the given arguments and result
+   * @function
+   */
   addAfterResolveHook: AfterHook<Schema, Result>;
+  /**
+   * Runs when the resolver function throws an error with the given arguments and error
+   * @function
+   */
   addErrorResolveHook: ErrorHook<Schema>;
-
+  /**
+   * Sets the resolver function. It can be used if you do not want to bundle your backend code with the client
+   * @function
+   */
   setResolver: Resolver<Schema, Result>;
-
+  /**
+   * Sets the type expectations for the return of resolver function.
+   * Also known as Result
+   * @function
+   */
   expect: <T>() => ReturnSubscription<Name, Schema, T>
 
   (args: z.input<Schema>): Meteor.SubscriptionHandle
