@@ -18,6 +18,17 @@ meteor npm i zod
 
 ## How to use it?
 
+```typescript
+import {   
+  ReturnMethod, // <- Type
+  ReturnSubscription, // <- Type
+  Config, // <- Type
+  SubscriptionCallbacks, // <- Type
+  createMethod, // <- function
+  createPublication // <- function
+} from 'grubba-rpc';
+```
+
 ### createMethod
 
 ```typescript
