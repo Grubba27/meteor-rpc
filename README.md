@@ -3,6 +3,7 @@
 ## What is this package?
 
 This package provides functions for building E2E type-safe RPCs.
+Inspired on [zodern:relay](https://github.com/zodern/meteor-relay) 
 they are:
 
 - crateMethod
