@@ -8,6 +8,7 @@ type Task = {
   createdAt: string;
 }
 const tasksByUser = createPublication('tasks.byUser', z.any()).expect<Task>()
+
 export {
   tasksByUser,
 }

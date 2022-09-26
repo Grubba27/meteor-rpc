@@ -3,6 +3,8 @@ import { TasksCollection } from './tasks.collection';
 import { Meteor } from 'meteor/meteor';
 import { checkLoggedIn } from '../common/auth';
 import * as Tasks from "../../common/tasks/mutations";
+import { createMethod } from "grubba-rpc";
+import { z } from 'zod'
 
 /**
  * Insert a task for the logged user.
@@ -17,6 +19,7 @@ const insertTask = ({ description }) => {
     createdAt: new Date(),
   });
 };
+
 
 /**
  * Check if user is logged in and is the task owner.
@@ -54,6 +57,7 @@ const toggleTaskDone = ({ taskId }) => {
   const task = TasksCollection.findOne(taskId);
   TasksCollection.update({ _id: taskId }, { $set: { done: !task.done } });
 };
+
 Tasks.insert.setResolver(insertTask);
 Tasks.remove.setResolver(removeTask);
 Tasks.setChecked.setResolver(toggleTaskDone);
