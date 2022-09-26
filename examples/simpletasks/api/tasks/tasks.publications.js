@@ -1,6 +1,6 @@
-import { Meteor } from 'meteor/meteor';
 import { TasksCollection } from './tasks.collection';
+import { tasksByUser } from "../../common/tasks/subscriptions";
 
-Meteor.publish('tasksByLoggedUser', function publishTasks() {
+tasksByUser.setResolver(function () {
   return TasksCollection.find({ userId: this.userId });
-});
+})
