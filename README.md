@@ -1,9 +1,10 @@
 # RPC
 
 ## What is this package?
+_Inspired on [zodern:relay](https://github.com/zodern/meteor-relay)_
 
-This package provides functions for building E2E type-safe RPCs.
-they are:
+
+This package provides functions for building E2E type-safe RPCs. The functions are:
 
 - crateMethod
 - createPublication
