@@ -133,9 +133,9 @@ fn.addAfterResolveHook((raw, parsed, result) => {
 const result = await fn();
 ```
 
-### Using code-splitting
+### Using safe methods
 
-check this example that illustrates this 'secure way' of using code-splitting
+check this example that illustrates this 'secure way' of using safe methods, as it is not bundled in the client
 ```typescript
 
 import { createMethod } from 'grubba-rpc'
@@ -172,3 +172,6 @@ insert({ description: 'test' });
 
 ```
 
+## Examples?
+
+in the examples folder you can find a simple example of how to use this package it uses [simpletasks](https://github.com/fredmaiaarantes/simpletasks) as a base

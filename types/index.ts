@@ -98,7 +98,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
    */
   expect: <T>() => ReturnSubscription<Name, Schema, T>
 
-  (args: z.input<Schema>): Meteor.SubscriptionHandle
+  (...args: Schema extends z.ZodUndefined | z.ZodTypeAny ? [SubscriptionCallbacks?] : [z.input<Schema>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle
 }
 type Maybe<T> = T | null | undefined | unknown;
 type Config<S, T> = {

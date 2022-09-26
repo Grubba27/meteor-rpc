@@ -1,4 +1,4 @@
-import { Config, ReturnSubscription } from "../types";
+import { Config, ReturnSubscription, SubscriptionCallbacks } from "../types";
 import { z } from "zod";
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
@@ -48,7 +48,7 @@ export const createPublication =
       RateLimiterConfig("subscription", name, config.rateLimit);
     }
 
-    function subscribe(args: z.input<Schema>) {
+    function subscribe(...args: Schema extends z.ZodUndefined | z.ZodTypeAny ? [SubscriptionCallbacks?] : [z.input<Schema>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle {
       return Meteor.subscribe(name,  args)
     }
 
