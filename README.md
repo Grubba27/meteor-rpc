@@ -176,3 +176,8 @@ insert({ description: 'test' });
 ## Examples?
 
 in the examples folder you can find a simple example of how to use this package it uses [simpletasks](https://github.com/fredmaiaarantes/simpletasks) as a base
+
+for downloading it you can do
+```bash
+git clone https://github.com/Grubba27/meteor-rpc/tree/main/examples/simpletasks
+```
