@@ -177,7 +177,7 @@ insert({ description: 'test' });
 
 in the examples folder you can find a simple example of how to use this package it uses [simpletasks](https://github.com/fredmaiaarantes/simpletasks) as a base
 
-for downloading it you can do
+for downloading it you can do the command below or just access this [link](https://github.com/Grubba27/meteor-rpc-template/generate)
 ```bash
-git clone https://github.com/Grubba27/meteor-rpc/tree/main/examples/simpletasks
+git clone https://github.com/Grubba27/meteor-rpc-template.git
 ```
