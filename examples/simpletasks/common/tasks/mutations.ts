@@ -10,6 +10,7 @@ const IDValidator = z.object({
 })
 
 const insert = createMethod('tasks.insert', TaskValidator).expect<void>()
+
 const remove = createMethod('tasks.remove', IDValidator).expect<void>()
 const setChecked = createMethod('tasks.setChecked', IDValidator).expect<void>()
 

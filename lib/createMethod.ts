@@ -13,7 +13,7 @@ import { runHook } from "./utils/runHook";
  * @param config config object to set the rate limit and hooks
  */
 export const createMethod =
-  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined  ? [] : [z.input<Schema>]>
+  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]>
   (name: Name, schema: Schema, resolver?: (args: z.input<Schema>) => Result, config?: Config<z.input<Schema>, Result>) => {
     const hooks = {
       onBeforeResolve: config?.hooks?.onBeforeResolve || [],
@@ -105,9 +105,14 @@ export const createMethod =
      * Also known as Result
      * @function
      */
-    call.expect = <T extends Result>(): ReturnMethod<Name, Schema, Result> => {
-      return call as ReturnMethod<Name, Schema, Result>
-    }
+    call.expect =
+      <T extends Result, SchemaResult extends Result = Result>
+      (expectedSchema?: SchemaResult): ReturnMethod<Name, Schema, Result> => {
+        return call as ReturnMethod<Name, Schema, Result>
+      }
 
     return call as ReturnMethod<Name, Schema, Result>;
   }
+
+export const createMutation = createMethod;
+export const createQuery = createMethod;

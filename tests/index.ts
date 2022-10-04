@@ -1,6 +1,6 @@
 import { Tinytest } from "meteor/tinytest";
 import { Meteor } from "meteor/meteor";
-import { createMethod } from "../server-main";
+import { createMethod, createPublication } from "../server-main";
 import { z } from "zod";
 
 Meteor.isServer && Tinytest.addAsync('rpc - example', async function (test) {
@@ -99,9 +99,22 @@ Meteor.isServer && Tinytest.addAsync('rpc - add resolver later', async function 
   test.equal(result, 3)
 })
 
+Meteor.isServer && Tinytest.addAsync('rpc - add resolver later using zod', async function (test) {
+  const id = new Date().toISOString()
+  const math = z.object({ n1: z.number(), n2: z.number() });
+  const fn = createMethod(`${ id }.fn`, math).expect(z.number())
+
+  fn.setResolver(({n1 , n2}) => n1 + n2)
+
+  const result = await fn({n1: 1, n2: 2})
+  test.equal(result, 3)
+})
+
 Meteor.isServer && Tinytest.addAsync('rpc - full test', async function (test) {
   const nameValidator = z.object({ first: z.string(), last: z.string() });
-  const getFullName = createMethod('some', nameValidator, ({first, last}) => {
+  const getFullName = createMethod('some', nameValidator, async ({first, last}) => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    await sleep(1000)
     return `${first} ${last}`
   })
   const d = await getFullName({last: 'last', first: 'first'})

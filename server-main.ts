@@ -1,4 +1,4 @@
-import { createMethod } from './lib/createMethod';
+import { createMethod, createMutation, createQuery } from './lib/createMethod';
 import { createPublication } from "./lib/createPublication";
 import {
   ReturnMethod,
@@ -13,5 +13,7 @@ export {
   Config,
   SubscriptionCallbacks,
   createMethod,
+  createMutation,
+  createQuery,
   createPublication,
 }

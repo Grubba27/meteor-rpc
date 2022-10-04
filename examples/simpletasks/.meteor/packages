@@ -27,4 +27,3 @@ percolate:migrations
 force-ssl@1.1.0
 mdg:meteor-apm-agent
 aldeed:collection2
-grubba:rpc

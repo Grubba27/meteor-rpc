@@ -9,11 +9,18 @@ This package provides functions for building E2E type-safe RPCs. The functions a
 - crateMethod
 - createPublication
 
-## Hot to download it?
+## How to download it?
+
 
 ```bash
-meteor add grubba:rpc
 meteor npm i grubba-rpc
+meteor npm i zod
+```
+
+or if you prefer using meteor package manager 
+
+```bash
+meteor add grubba:rpc 
 meteor npm i zod
 ```
 
@@ -38,6 +45,31 @@ const test1 = createMethod('name', z.any(), () => 'str');
 const result = await test1();
 //    ˆ? is string and their value is 'str'
 ```
+For semantics uses you can as well use the methods below with the same output as createMethod:
+
+```typescript
+const joinStr =  createMutation(
+  'join', 
+  z.object({ foo: z.string(), bar: z.string() }),
+  ({ foo, bar }) => foo + bar);
+const result = await joinStr({ foo: 'foo', bar: 'bar' });
+//    ˆ? is string and their value is 'foobar'
+```
+
+```typescript
+const query =  createQuery(
+  'query', 
+  z.object({ _id: z.string() }),
+  async ({ _id }) => {
+    const someData = await DB.findOne(_id);
+    const otherData = await DB.find({ _id: { $ne: someData._id } }).fetchAsync();
+    return { someData, otherData };
+  });
+const result = await query({ _id: 'id' });
+//    ˆ? is string and their value is the item you was querying
+```
+
+
 
 _example of use_
 
@@ -147,6 +179,10 @@ const DescriptionValidator = z.object({ description: z.string() });
 // tasks.mutations.ts
 // it expects the return type to be a void
 export const insert = createMethod('task.insert', DescriptionValidator).expect<void>();
+
+// tasks.mutations.js
+// If you are using javascript, you can use the following syntax
+export const insert = createMethod('task.insert', DescriptionValidator).expect(z.void());
 
 // ---------
 

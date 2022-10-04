@@ -14,8 +14,8 @@ import { runHook } from "./utils/runHook";
  * @param config config object to set the rate limit and hooks
  */
 export const createPublication =
-  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]>
-  (name: Name, schema: Schema, resolver?: (this: MeteorSubscription, args: UnwrappedArgs) => Result, config?: Config<UnwrappedArgs, Result>) => {
+  <Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, DBResult = Mongo.Cursor<Result>, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]>
+  (name: Name, schema: Schema, resolver?: (this: MeteorSubscription, args: UnwrappedArgs) => DBResult, config?: Config<UnwrappedArgs, DBResult>) => {
     const hooks = {
       onBeforeResolve: config?.hooks?.onBeforeResolve || [],
       onAfterResolve: config?.hooks?.onAfterResolve || [],
@@ -66,9 +66,8 @@ export const createPublication =
      * @function
      */
     subscribe.addAfterResolveHook =
-      (fn: (raw: unknown, parsed: z.input<Schema>, result: Result) => void) => {
+      (fn: (raw: unknown, parsed: z.input<Schema>, result: DBResult) => void) => {
         hooks.onAfterResolve.push(fn);
-
       }
 
     /**
@@ -85,8 +84,8 @@ export const createPublication =
      * @function
      */
     subscribe.setResolver =
-      (newResolver: (this: MeteorSubscription, args: z.input<Schema>) => Result) => {
-      resolver = newResolver
+      (newResolver: (this: MeteorSubscription, args: z.input<Schema>) => DBResult) => {
+      resolver = newResolver;
     }
 
     subscribe.config = { ...config, name, schema }
@@ -95,9 +94,11 @@ export const createPublication =
      * Also known as Result
      * @function
      */
-    subscribe.expect = <T extends Result>(): ReturnSubscription<Name, Schema, Result> => {
-      return subscribe as ReturnSubscription<Name, Schema, Result>
-    }
+    subscribe.expect =
+      <T extends Result, SchemaResult extends Result = Result>
+      (newSchema?: SchemaResult): ReturnSubscription<Name, Schema, Result> => {
+        return subscribe as unknown as ReturnSubscription<Name, Schema, Result>
+      }
 
-    return subscribe as ReturnSubscription<Name, Schema, Result>
+    return subscribe as unknown as ReturnSubscription<Name, Schema, Result>
   }

@@ -52,12 +52,13 @@ type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodType
    * Also known as Result
    * @function
    */
-  expect: <T>() => ReturnMethod<Name, Schema, T>
+  expect: <T, SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined>
+  (newSchema?: SchemaResult) => SchemaResult extends z.ZodUndefined ? ReturnMethod<Name, Schema, T> : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
 
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 }
 
-type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
+type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, DBResult extends Mongo.Cursor<Result> = Mongo.Cursor<Result>, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
   config: {
     name: Name;
     schema: Schema,
@@ -67,7 +68,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
     },
     methodHooks?: {
       onBeforeResolve?: Array<(args?: unknown, parsed?: z.input<Schema>) => void>;
-      onAfterResolve?: Array<(args?: z.input<Schema>, result?: Result) => void>;
+      onAfterResolve?: Array<(args?: z.input<Schema>, result?: DBResult) => void>;
       onErrorResolve?: Array<(err?: Meteor.Error | Error | unknown, raw?: unknown, parsed?: z.input<Schema>) => void>;
     }
   };
@@ -80,7 +81,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
    * Runs after the resolver function with the given arguments and result
    * @function
    */
-  addAfterResolveHook: AfterHook<Schema, Result>;
+  addAfterResolveHook: AfterHook<Schema, DBResult>;
   /**
    * Runs when the resolver function throws an error with the given arguments and error
    * @function
@@ -90,13 +91,14 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
    * Sets the resolver function. It can be used if you do not want to bundle your backend code with the client
    * @function
    */
-  setResolver: Resolver<Schema, Result>;
+  setResolver: Resolver<Schema, DBResult>;
   /**
    * Sets the type expectations for the return of resolver function.
    * Also known as Result
    * @function
    */
-  expect: <T>() => ReturnSubscription<Name, Schema, T>
+  expect: <T, SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined>
+  (newSchema?: SchemaResult) => SchemaResult extends z.ZodUndefined ? ReturnMethod<Name, Schema, T> : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
 
   (...args: Schema extends z.ZodUndefined | z.ZodTypeAny ? [SubscriptionCallbacks?] : [z.input<Schema>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle
 }
