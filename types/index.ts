@@ -10,7 +10,7 @@ type AfterHook<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
 type ErrorHook<Schema extends z.ZodUndefined | z.ZodTypeAny> =
   (fn: (error: unknown, raw: unknown, parsed: z.infer<Schema>) => void) => void;
 
-type Resolver<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
+export type Resolver<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
   (newResolver: (args: z.input<Schema>) => Result) => void;
 
 type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]> = {

@@ -1,8 +1,8 @@
 # RPC
 
 ## What is this package?
-_Inspired on [zodern:relay](https://github.com/zodern/meteor-relay)_
 
+_Inspired on [zodern:relay](https://github.com/zodern/meteor-relay)_
 
 This package provides functions for building E2E type-safe RPCs. The functions are:
 
@@ -11,13 +11,12 @@ This package provides functions for building E2E type-safe RPCs. The functions a
 
 ## How to download it?
 
-
 ```bash
 meteor npm i grubba-rpc
 meteor npm i zod
 ```
 
-or if you prefer using meteor package manager 
+or if you prefer using meteor package manager
 
 ```bash
 meteor add grubba:rpc 
@@ -27,7 +26,7 @@ meteor npm i zod
 ## How to use it?
 
 ```typescript
-import {   
+import {
   ReturnMethod, // <- Type
   ReturnSubscription, // <- Type
   Config, // <- Type
@@ -45,11 +44,12 @@ const test1 = createMethod('name', z.any(), () => 'str');
 const result = await test1();
 //    ˆ? is string and their value is 'str'
 ```
+
 For semantics uses you can as well use the methods below with the same output as createMethod:
 
 ```typescript
-const joinStr =  createMutation(
-  'join', 
+const joinStr = createMutation(
+  'join',
   z.object({ foo: z.string(), bar: z.string() }),
   ({ foo, bar }) => foo + bar);
 const result = await joinStr({ foo: 'foo', bar: 'bar' });
@@ -57,8 +57,8 @@ const result = await joinStr({ foo: 'foo', bar: 'bar' });
 ```
 
 ```typescript
-const query =  createQuery(
-  'query', 
+const query = createQuery(
+  'query',
   z.object({ _id: z.string() }),
   async ({ _id }) => {
     const someData = await DB.findOne(_id);
@@ -68,8 +68,6 @@ const query =  createQuery(
 const result = await query({ _id: 'id' });
 //    ˆ? is string and their value is the item you was querying
 ```
-
-
 
 _example of use_
 
@@ -169,6 +167,7 @@ const result = await fn();
 ### Using safe methods
 
 check this example that illustrates this 'secure way' of using safe methods, as it is not bundled in the client
+
 ```typescript
 
 import { createMethod } from 'grubba-rpc'
@@ -188,6 +187,7 @@ export const insert = createMethod('task.insert', DescriptionValidator).expect(z
 
 // tasks.methods.ts
 import { insert } from './tasks.mutations.ts'
+
 insertTask = ({ description }) => {
   TasksCollection.insert({
     description,
@@ -203,17 +203,52 @@ insert.setResolver(insertTask);
 
 // client.ts
 import { insert } from './tasks.mutations.ts'
+
 insert({ description: 'test' });
 //^? it return void and it will run
 // if resolver is not set it will throw an error
 
 ```
 
+### Experimental
+
+#### createModule
+
+```typescript
+const Tasks = createModule('tasks', {insert, remove, setChecked}).build();
+const foo = createModule('foo')
+  .addMethod('bar', z.string(), () => 'bar' as const)
+  .addMethod('baz', z.string(), () => 'baz')
+  .addQuery('get', z.string(), () => 'get')
+  .build();
+const k = await foo.bar();
+//   ?^ 'bar'
+```
+There is as well the safeBuild method that will return a module and a setter for that module resolvers
+
+```typescript
+const [TaskModule, setTaskResolver]  = createModule('tasks', {insert, remove, setChecked}).safeBuild();
+setTaskResolver({ insert: ({description}) => 1 })
+setTaskResolver({
+  remove: ({taskId}) => {
+    console.log(taskId)
+  },
+  setChecked: ({taskId}) => {
+    console.log(taskId)
+  }
+})
+
+```
+ I'm still solving the problem of how to type the resolvers.
+
 ## Examples?
 
-in the examples folder you can find a simple example of how to use this package it uses [simpletasks](https://github.com/fredmaiaarantes/simpletasks) as a base
+in the examples folder you can find a simple example of how to use this package it
+uses [simpletasks](https://github.com/fredmaiaarantes/simpletasks) as a base
 
-for downloading it you can do the command below or just access this [link](https://github.com/Grubba27/meteor-rpc-template/generate)
+for downloading it you can do the command below or just access
+this [link](https://github.com/Grubba27/meteor-rpc-template/generate)
+
 ```bash
 git clone https://github.com/Grubba27/meteor-rpc-template.git
 ```

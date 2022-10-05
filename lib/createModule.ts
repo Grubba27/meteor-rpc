@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Config, ReturnMethod, ReturnSubscription } from "../types";
+import { Config, Resolver, ReturnMethod, ReturnSubscription } from "../types";
 import { createMethod, createPublication } from "../server-main";
 import { Meteor, Subscription as MeteorSubscription } from 'meteor/meteor'
 
@@ -44,16 +44,14 @@ export const createModule =
 
     const safeBuild = () => {
       const setResolvers =
-        <S extends z.ZodUndefined | z.ZodTypeAny,
-          Result,
-          Resolvers extends Partial<Record<string, <S extends z.ZodUndefined | z.ZodTypeAny, Result>(args: z.input<S>) => Result>>>
+        <Schema extends z.ZodUndefined | z.ZodTypeAny, Result, Resolvers extends Partial<Submodules> >
         (resolvers: Resolvers) => {
           Object.keys(resolvers).forEach((key: keyof Submodules & keyof Resolvers & string) => {
-            const resolver = resolvers[key];
+            const resolver = resolvers[key] as (args: z.input<Schema>) => Result ;
             if (subModules === undefined) {
               throw new Error(`Resolver ${ key } is not defined`)
             }
-            const method = subModules[key] as ReturnMethod<`${ RouteName }.${ typeof key }`, S, Result>;
+            const method = subModules[key] as ReturnMethod<RouteName extends undefined ? typeof key : `${ RouteName }.${ typeof key }`, Schema, Result>;
             if (subModules[key]) {
               if (resolver === undefined) {
                 throw new Error(`Resolver ${ key } is not defined`)
@@ -62,8 +60,9 @@ export const createModule =
             }
           })
         }
+
       return [
-        build(),
+        subModules as Submodules extends infer O ? { [K in keyof O]: O[K] } : never,
         setResolvers
       ]
     }
