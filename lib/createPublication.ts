@@ -31,7 +31,7 @@ export const createPublication =
 
         runHook(hooks.onBeforeResolve, args, parsed);
         if (resolver === undefined) {
-          throw new Error(`Method ${name} is not implemented please provide the resolver function or use setResolver`)
+          throw new Error(`Method ${ name } is not implemented please provide the resolver function or use setResolver`)
         }
 
         try {
@@ -39,6 +39,9 @@ export const createPublication =
           runHook(hooks.onAfterResolve, args, parsed, result);
           return result
         } catch (e) {
+          if (!hooks.onErrorResolve.length) {
+            throw e;
+          }
           runHook(hooks.onErrorResolve, e, args, parsed);
         }
       })
@@ -49,7 +52,7 @@ export const createPublication =
     }
 
     function subscribe(...args: Schema extends z.ZodUndefined | z.ZodTypeAny ? [SubscriptionCallbacks?] : [z.input<Schema>, SubscriptionCallbacks?]): Meteor.SubscriptionHandle {
-      return Meteor.subscribe(name,  args)
+      return Meteor.subscribe(name, args)
     }
 
     /**
@@ -85,8 +88,8 @@ export const createPublication =
      */
     subscribe.setResolver =
       (newResolver: (this: MeteorSubscription, args: z.input<Schema>) => DBResult) => {
-      resolver = newResolver;
-    }
+        resolver = newResolver;
+      }
 
     subscribe.config = { ...config, name, schema }
     /**

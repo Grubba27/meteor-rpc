@@ -40,6 +40,9 @@ export const createMethod =
               return result;
             }
           } catch (e: Meteor.Error | Error | unknown) {
+            if (!hooks.onErrorResolve.length) {
+              throw e;
+            }
             runHook(hooks.onErrorResolve, e, data, parsed);
           }
         }
