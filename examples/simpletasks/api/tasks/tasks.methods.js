@@ -4,7 +4,7 @@ import { Meteor } from 'meteor/meteor';
 import { checkLoggedIn } from '../common/auth';
 import * as Tasks from "../../common/tasks/mutations";
 import { createMethod } from "grubba-rpc";
-import { TaskValidator } from "../../common/tasks/mutations";
+import { setTaskResolver, TaskValidator } from "../../common/tasks/mutations";
 
 /**
  * Insert a task for the logged user.
@@ -58,7 +58,8 @@ const toggleTaskDone = ({ taskId }) => {
   TasksCollection.update({ _id: taskId }, { $set: { done: !task.done } });
 };
 
-Tasks.insert.setResolver(insertTask);
-
-Tasks.remove.setResolver(removeTask);
-Tasks.setChecked.setResolver(toggleTaskDone);
+setTaskResolver({
+  insert: insertTask,
+  remove: removeTask,
+  setChecked: toggleTaskDone
+})
