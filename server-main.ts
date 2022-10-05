@@ -1,5 +1,11 @@
-import { createMethod, createMutation, createQuery } from './lib/createMethod';
-import { createPublication } from "./lib/createPublication";
+import {
+  createMutation,
+  createQuery,
+  createPublication,
+  createModule,
+  createMethod
+} from './lib';
+
 import {
   ReturnMethod,
   ReturnSubscription,
@@ -15,5 +21,6 @@ export {
   createMethod,
   createMutation,
   createQuery,
+  createModule,
   createPublication,
 }
