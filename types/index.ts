@@ -17,6 +17,7 @@ type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodType
   config: {
     name: Name;
     schema: Schema,
+    __result: Result,
     rateLimit?: {
       interval: number,
       limit: number
@@ -62,6 +63,7 @@ type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTy
   config: {
     name: Name;
     schema: Schema,
+    __result: Result,
     rateLimit?: {
       interval: number,
       limit: number

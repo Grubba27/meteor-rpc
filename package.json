@@ -1,6 +1,6 @@
 {
   "name": "grubba-rpc",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
