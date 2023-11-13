@@ -1,3 +1,4 @@
+import { UseMutationResult, UseSuspenseQueryResult } from "@tanstack/react-query";
 import { Meteor } from "meteor/meteor";
 import { z } from "zod"
 
@@ -56,6 +57,10 @@ type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodType
   expect: <T, SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined>
   (newSchema?: SchemaResult) => SchemaResult extends z.ZodUndefined ? ReturnMethod<Name, Schema, T> : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
 
+
+  useMutation: () => UseMutationResult<Result, Error, Schema>
+
+  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Result, Error>
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 }
 

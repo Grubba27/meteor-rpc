@@ -4,6 +4,8 @@ import { isThenable } from './utils/isThenable'
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
+import { UseMutationResult, UseSuspenseQueryResult, useMutation as useMutationRQ } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 
 /**
  * Creates a method that can be called from the client, or from the server
@@ -113,6 +115,23 @@ export const createMethod =
       (expectedSchema?: SchemaResult): ReturnMethod<Name, Schema, Result> => {
         return call as ReturnMethod<Name, Schema, Result>
       }
+
+    call.useMutation =
+    (): UseMutationResult<Result, Error, Schema> => {
+      return useMutationRQ({
+        mutationFn: (...params) => call(params),
+      });
+    };
+
+    call.useQuery =
+    (args?: z.input<Schema>): UseSuspenseQueryResult<Result, Error> => {
+      if (args === undefined) args = [];
+      return useSuspenseQuery({
+        queryKey: [call.config.name, ...args],
+        queryFn: () => call(args)
+      });
+    }
+
 
     return call as ReturnMethod<Name, Schema, Result>;
   }

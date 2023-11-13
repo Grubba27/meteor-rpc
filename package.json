@@ -1,6 +1,6 @@
 {
   "name": "grubba-rpc",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
@@ -14,5 +14,10 @@
     "test": "meteor test-packages ./ "
   },
   "main": "server-main.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@tanstack/react-query": "^5.8.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }
