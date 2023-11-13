@@ -117,6 +117,16 @@ export const createMethod =
       }
 
     /**
+     * Sets the type expectations for the return of resolver function.
+     * Also known as Result
+     * @function
+     */
+    call.returns =
+    <T extends Result, SchemaResult extends Result = Result>
+    (expectedSchema?: SchemaResult): ReturnMethod<Name, Schema, Result> => {
+      return call as ReturnMethod<Name, Schema, Result>
+    }
+    /**
      * Creates a react-query useMutation hook using the context for the method
      * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
      */

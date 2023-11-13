@@ -79,6 +79,19 @@ type ReturnMethod<
     : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
 
   /**
+   * Sets the type expectations for the return of resolver function.
+   * Also known as Result
+   * @function
+   */
+  returns: <
+  T,
+  SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined
+>(
+  newSchema?: SchemaResult
+) => SchemaResult extends z.ZodUndefined
+  ? ReturnMethod<Name, Schema, T>
+  : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
+  /**
    * Creates a react-query useMutation hook using the context for the method
    * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
    */
