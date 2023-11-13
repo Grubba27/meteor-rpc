@@ -182,6 +182,8 @@ export const insert = createMethod('task.insert', DescriptionValidator).expect<v
 // tasks.mutations.js
 // If you are using javascript, you can use the following syntax
 export const insert = createMethod('task.insert', DescriptionValidator).expect(z.void());
+// or you can use other name such as:
+export const insert = createMethod('task.insert', DescriptionValidator).returns(z.void());
 
 // ---------
 
