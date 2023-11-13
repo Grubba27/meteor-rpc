@@ -19,7 +19,7 @@ meteor npm i zod
 or if you prefer using meteor package manager
 
 ```bash
-meteor add grubba:rpc 
+meteor add grubba:rpc
 meteor npm i zod
 ```
 
@@ -97,7 +97,7 @@ type Config<S, T> = {
 ```typescript
   const publication = createPublication('findRooms', z.object({ level: z.number() }), ({ level }) => Rooms.find({ level: level }));
 const result = publication({ level: 1 }, (rooms) => console.log(rooms));
-//                                            ˆ? subscription 
+//                                            ˆ? subscription
 
 ```
 
@@ -252,3 +252,34 @@ this [link](https://github.com/Grubba27/meteor-rpc-template/generate)
 ```bash
 git clone https://github.com/Grubba27/meteor-rpc-template.git
 ```
+
+## React focused API
+
+For now, only works for methods
+
+```typescript
+
+const test1 = createMethod('name', z.any(), () => 'str');
+// in react context / component.tsx
+
+
+const { data } = test1.useQuery();
+// works like useSuspenseQuery from https://tanstack.com/query/latest/docs/react/reference/useSuspenseQuery
+
+
+// or you can use for mutation
+const { mutate } = test1.useMutation();
+// uses the https://tanstack.com/query/v4/docs/react/reference/useMutation under the hood
+```
+
+
+## method.useQuery
+
+This uses the same api as [useSuspenseQuery](https://tanstack.com/query/latest/docs/react/reference/useSuspenseQuery)
+
+## method.useMutation
+
+This uses the same api as [useMutation](https://tanstack.com/query/v4/docs/react/reference/useMutation)
+
+
+

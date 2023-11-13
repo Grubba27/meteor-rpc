@@ -116,6 +116,10 @@ export const createMethod =
         return call as ReturnMethod<Name, Schema, Result>
       }
 
+    /**
+     * Creates a react-query useMutation hook using the context for the method
+     * @returns {UseMutationResult<Result, Error, Schema>} react-query useMutation hook
+     */
     call.useMutation =
     (): UseMutationResult<Result, Error, Schema> => {
       return useMutationRQ({
@@ -123,6 +127,11 @@ export const createMethod =
       });
     };
 
+    /**
+     * Creates a react-query useQuery hook using the context for the method
+     * @param args[z.input<Schema>] Args that comes from schema
+     * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
+     */
     call.useQuery =
     (args?: z.input<Schema>): UseSuspenseQueryResult<Result, Error> => {
       if (args === undefined) args = [];

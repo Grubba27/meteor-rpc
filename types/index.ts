@@ -14,20 +14,35 @@ type ErrorHook<Schema extends z.ZodUndefined | z.ZodTypeAny> =
 export type Resolver<Schema extends z.ZodUndefined | z.ZodTypeAny, Result> =
   (newResolver: (args: z.input<Schema>) => Result) => void;
 
-type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodTypeAny, Result, UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined ? [] : [z.input<Schema>]> = {
+type ReturnMethod<
+  Name extends string,
+  Schema extends z.ZodUndefined | z.ZodTypeAny,
+  Result,
+  UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
+    ? []
+    : [z.input<Schema>]
+> = {
   config: {
     name: Name;
-    schema: Schema,
-    __result: Result,
+    schema: Schema;
+    __result: Result;
     rateLimit?: {
-      interval: number,
-      limit: number
-    },
+      interval: number;
+      limit: number;
+    };
     methodHooks?: {
       onBeforeResolve?: Array<(raw: unknown, parsed: z.input<Schema>) => void>;
-      onAfterResolve?: Array<(raw: unknown, parsed: z.input<Schema>, result: Result) => void>;
-      onErrorResolve?: Array<(err: Meteor.Error | Error | unknown, raw: unknown, parsed: z.input<Schema>) => void>;
-    }
+      onAfterResolve?: Array<
+        (raw: unknown, parsed: z.input<Schema>, result: Result) => void
+      >;
+      onErrorResolve?: Array<
+        (
+          err: Meteor.Error | Error | unknown,
+          raw: unknown,
+          parsed: z.input<Schema>
+        ) => void
+      >;
+    };
   };
   /**
    * Runs before the resolver function with the given arguments
@@ -54,15 +69,29 @@ type ReturnMethod<Name extends string, Schema extends z.ZodUndefined | z.ZodType
    * Also known as Result
    * @function
    */
-  expect: <T, SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined>
-  (newSchema?: SchemaResult) => SchemaResult extends z.ZodUndefined ? ReturnMethod<Name, Schema, T> : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
+  expect: <
+    T,
+    SchemaResult extends z.ZodUndefined | z.ZodTypeAny = z.ZodUndefined
+  >(
+    newSchema?: SchemaResult
+  ) => SchemaResult extends z.ZodUndefined
+    ? ReturnMethod<Name, Schema, T>
+    : ReturnMethod<Name, Schema, z.infer<SchemaResult>>;
 
+  /**
+   * Creates a react-query useMutation hook using the context for the method
+   * @returns {UseMutationResult<Result, Error, Schema>} react-query useMutation hook
+   */
+  useMutation: () => UseMutationResult<Result, Error, Schema>;
 
-  useMutation: () => UseMutationResult<Result, Error, Schema>
-
-  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Result, Error>
+  /**
+   * Creates a react-query useQuery hook using the context for the method
+   * @param args[z.input<Schema>] Args that comes from schema
+   * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
+   */
+  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Result, Error>;
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
-}
+};
 
 type ReturnSubscription<Name extends string, Schema extends z.ZodTuple | z.ZodTypeAny, Result, DBResult extends Mongo.Cursor<Result> = Mongo.Cursor<Result>, UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple ? z.infer<Schema> : []> = {
   config: {
