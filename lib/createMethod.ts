@@ -134,9 +134,8 @@ export const createMethod =
      */
     call.useQuery =
     (args?: z.input<Schema>): UseSuspenseQueryResult<Result, Error> => {
-      if (args === undefined) args = [];
       return useSuspenseQuery({
-        queryKey: [call.config.name, ...args],
+        queryKey: [call.config.name, args],
         queryFn: () => call(args)
       });
     }
