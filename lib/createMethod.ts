@@ -123,7 +123,7 @@ export const createMethod =
     call.useMutation =
     (): UseMutationResult<Result, Error, z.input<Schema>> => {
       return useMutationRQ({
-        mutationFn: (...params) => call(params),
+        mutationFn: (params) => call(params),
       });
     };
 
