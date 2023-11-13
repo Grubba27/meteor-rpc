@@ -80,9 +80,9 @@ type ReturnMethod<
 
   /**
    * Creates a react-query useMutation hook using the context for the method
-   * @returns {UseMutationResult<Result, Error, Schema>} react-query useMutation hook
+   * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
    */
-  useMutation: () => UseMutationResult<Result, Error, Schema>;
+  useMutation: () => UseMutationResult<Result, Error, z.input<Schema>>;
 
   /**
    * Creates a react-query useQuery hook using the context for the method
