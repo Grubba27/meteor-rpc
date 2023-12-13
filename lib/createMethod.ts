@@ -143,7 +143,7 @@ export const createMethod =
      * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
      */
     call.useQuery =
-    (args?: z.input<Schema>): UseSuspenseQueryResult<Result, Error> => {
+    (args?: z.input<Schema>): UseSuspenseQueryResult<Awaited<Result>, Error> => {
       return useSuspenseQuery({
         queryKey: [call.config.name, args],
         queryFn: () => call(args)

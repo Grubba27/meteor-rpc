@@ -109,7 +109,7 @@ type ReturnMethod<
    * @param args[z.input<Schema>] Args that comes from schema
    * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
    */
-  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Result, Error>;
+  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Awaited<Result>, Error>;
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 };
 
