@@ -8,7 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { Navbar } from './common/Navbar';
 import { Footer } from './common/Footer';
-
+import {} from 'grubba-rpc'
 const theme = extendTheme({
   config: {
     initialColorMode: 'dark',
