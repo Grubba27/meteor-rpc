@@ -3,8 +3,10 @@ import {
   createQuery,
   createPublication,
   createModule,
-  createMethod
-} from './lib';
+  createMethod,
+  createClient,
+  createSafeCaller,
+} from "./lib";
 
 import {
   ReturnMethod,
@@ -23,4 +25,6 @@ export {
   createQuery,
   createModule,
   createPublication,
-}
+  createClient,
+  createSafeCaller,
+};
