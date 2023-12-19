@@ -36,7 +36,13 @@ export const createModule =
         } as Submodules & Record<Name, ReturnSubscription<RouteName extends undefined ? Name : `${ RouteName }.${ Name }`, Schema, T>>)
       }
 
-
+    const addSubmodule = <Name extends string, T extends Submodules>(name: Name, submodule: T) => {
+      const obj = { [name]: submodule };
+      return createModule<RouteName, Submodules & Record<Name, T>>(prefix, {
+        ...subModules,
+        ...obj
+      } as Submodules & Record<Name, T>)
+    }
     const build =
       () => subModules as unknown as Submodules extends infer O ? { [K in keyof O]: O[K] } : never;
 
@@ -70,6 +76,7 @@ export const createModule =
     const addQuery = addMethod;
     return {
       addMethod,
+      addSubmodule,
       addMutation,
       addQuery,
       addPublication,

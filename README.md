@@ -222,6 +222,7 @@ const foo = createModule('foo')
   .addMethod('bar', z.string(), () => 'bar' as const)
   .addMethod('baz', z.string(), () => 'baz')
   .addQuery('get', z.string(), () => 'get')
+  .addSubmodule('task', Tasks)
   .build();
 const k = await foo.bar();
 //   ?^ 'bar'
@@ -284,4 +285,42 @@ This uses the same api as [useSuspenseQuery](https://tanstack.com/query/latest/d
 This uses the same api as [useMutation](https://tanstack.com/query/v4/docs/react/reference/useMutation)
 
 
+
+
+### Using in the client
+
+When using in the client you _should_ use the `createModule` and `build` methods to create a module that will be used in the client
+and be sure that you are exporting the type of the module
+
+```typescript
+// server.ts
+
+const otherModule = createModule()
+  .addMethod('bar', z.string(), () => 'bar')
+  .build();
+const server = createModule()
+  .addMethod('foo', z.string(), () => 'foo')
+  .addMethod('bar', z.string(), () => 'bar')
+  .addSubmodule('other', otherModule)
+  .build();
+
+export type Server = typeof server;
+
+
+// client.ts
+
+import type { Server } from './server.ts'
+
+const app = createSafeCaller<Server>();
+
+app.call('foo') // <--- This is type safe
+
+// or you can use the proxy approach
+
+const app = createClient<Server>();
+
+app.foo("str") // <--- This is type safe
+app.other.bar("str") // <--- This is type safe
+
+```
 
