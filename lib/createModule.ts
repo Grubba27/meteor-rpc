@@ -36,7 +36,7 @@ export const createModule =
         } as Submodules & Record<Name, ReturnSubscription<RouteName extends undefined ? Name : `${ RouteName }.${ Name }`, Schema, T>>)
       }
 
-    const addSubmodule = <Name extends string, T extends Submodules>(name: Name, submodule: T) => {
+    const addSubmodule = <Name extends string, T extends Record<string, unknown>>(name: Name, submodule: T) => {
       const obj = { [name]: submodule };
       return createModule<RouteName, Submodules & Record<Name, T>>(prefix, {
         ...subModules,
