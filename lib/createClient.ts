@@ -42,10 +42,11 @@ const createProxyClient = <T extends R, Prop = keyof T>(
       return createProxyClient([...path, key]);
     },
     apply(_1, _2, args) {
-      const lastArg = args.at(-1);
+      const lastArg = path.at(-1);
       if (lastArg === "useQuery" || lastArg === "useMutation") {
-        args.pop();
+        path = path.slice(0, -1);
       }
+
       const name = path.join(".");
 
       function call(...params) {
