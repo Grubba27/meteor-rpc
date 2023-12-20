@@ -296,6 +296,10 @@ This uses the same api as [useMutation](https://tanstack.com/query/v4/docs/react
 When using in the client you _should_ use the `createModule` and `build` methods to create a module that will be used in the client
 and be sure that you are exporting the type of the module
 
+_You should only create one client in your application_
+
+You can have something like `api.ts` that will export the client and the type of the client
+
 ```typescript
 // server.ts
 
