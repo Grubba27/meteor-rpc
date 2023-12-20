@@ -26,16 +26,10 @@ export const createSafeCaller = <T extends R>() => {
   };
 };
 
-type ToIgnore =
-  | "addBeforeResolveHook"
-  | "addAfterResolveHook"
-  | "addErrorResolveHook"
-  | "setResolver"
-  | "expect"
-  | "returns";
-  
+
+
 // @ts-ignore
-export const createClient = <T>() => createProxyClient<T>() as Omit<T, ToIgnore>;
+export const createClient = <T>() => createProxyClient<T>() as T;
 
 const createProxyClient = <T extends R, Prop = keyof T>(
   path: string[] = []
