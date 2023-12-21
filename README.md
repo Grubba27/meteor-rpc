@@ -20,13 +20,6 @@ meteor npm i grubba-rpc
 meteor npm i zod
 ```
 
-or if you prefer using meteor package manager
-
-```bash
-meteor add grubba:rpc
-meteor npm i zod
-```
-
 ## How to use it?
 
 ```typescript
@@ -37,6 +30,8 @@ import {
   SubscriptionCallbacks, // <- Type
   createMethod, // <- function
   createPublication // <- function
+  createModule, // <- function
+  createClient, // <- function
 } from 'grubba-rpc';
 ```
 
@@ -216,9 +211,8 @@ insert({ description: 'test' });
 
 ```
 
-### Experimental
 
-#### createModule
+### createModule
 
 ```typescript
 const Tasks = createModule('tasks', {insert, remove, setChecked}).build();
@@ -231,22 +225,6 @@ const foo = createModule('foo')
 const k = await foo.bar();
 //   ?^ 'bar'
 ```
-There is as well the safeBuild method that will return a module and a setter for that module resolvers
-
-```typescript
-const [TaskModule, setTaskResolver]  = createModule('tasks', {insert, remove, setChecked}).safeBuild();
-setTaskResolver({ insert: ({description}) => 1 })
-setTaskResolver({
-  remove: ({taskId}) => {
-    console.log(taskId)
-  },
-  setChecked: ({taskId}) => {
-    console.log(taskId)
-  }
-})
-
-```
- I'm still solving the problem of how to type the resolvers.
 
 ## Examples?
 
@@ -317,13 +295,6 @@ export type Server = typeof server;
 
 // client.ts
 
-import type { Server } from './server.ts'
-
-const app = createSafeCaller<Server>();
-
-app.call('foo') // <--- This is type safe
-
-// or you can use the proxy approach
 
 const app = createClient<Server>();
 
