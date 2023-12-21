@@ -10,7 +10,6 @@ This package provides functions for building E2E type-safe RPCs. The functions a
 - createPublication
 - createModule
 - createClient
-- createSafeCaller
 
 
 ## How to download it?
