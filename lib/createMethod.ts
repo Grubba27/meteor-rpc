@@ -25,26 +25,30 @@ export const createMethod =
     if (Meteor.isServer) {
       Meteor.methods({
         [name](data: unknown) {
-
-          const parsed: z.output<Schema> = schema.parse(data);
-          runHook(hooks.onBeforeResolve, data, parsed);
-
-          if (resolver === undefined) {
-            throw new Error(`Method ${ name } is not implemented please provide the resolver function or use setResolver`)
-          }
-
+          let parsed: z.output<Schema>;
           try {
-            const result: Result = resolver(parsed)
-            runHook(hooks.onAfterResolve, data, parsed, result);
-            if (isThenable(result)) {
-              return (Promise as any).await(result);
-            } else {
-              return result;
+            parsed = schema.parse(data);
+            runHook(hooks.onBeforeResolve, data, parsed);
+
+            if (resolver === undefined) {
+              throw new Error(
+                `Method ${name} is not implemented please provide the resolver function or use setResolver`
+              );
             }
+
+            const result: Result = resolver(parsed);
+            if (isThenable(result)) {
+              result.then((res) => {
+                runHook(hooks.onAfterResolve, data, parsed, res);
+              });
+            } else runHook(hooks.onAfterResolve, data, parsed, result);
+
+            return result;
           } catch (e: Meteor.Error | Error | unknown) {
             if (!hooks.onErrorResolve.length) {
               throw e;
             }
+            // @ts-ignore
             runHook(hooks.onErrorResolve, e, data, parsed);
           }
         }
@@ -55,15 +59,8 @@ export const createMethod =
     }
 
     function call(args?: z.input<Schema>): Promise<Result> {
-      return new Promise<Result>((resolve, reject) => {
-        Meteor.call(name, args, (err: null | Meteor.Error, result: Result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        });
-      });
+      // @ts-ignore
+      return Meteor.callAsync(name, args);
     }
 
 

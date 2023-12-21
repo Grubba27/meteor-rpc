@@ -52,19 +52,7 @@ const createProxyClient = <T extends R, Prop = keyof T>(
       const name = path.join(".");
 
       function call(...params) {
-        return new Promise((resolve, reject) => {
-          Meteor.call(
-            name,
-            ...params,
-            (err: null | Meteor.Error, result: any) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve(result);
-              }
-            }
-          );
-        });
+        return Meteor.callAsync(name, ...params);
       }
 
       if (lastArg === "useQuery") {
