@@ -42,11 +42,10 @@ export const createMethod =
                 runHook(hooks.onAfterResolve, data, parsed, res);
               });
             } else runHook(hooks.onAfterResolve, data, parsed, result);
-
             return result;
           } catch (e: Meteor.Error | Error | unknown) {
             if (!hooks.onErrorResolve.length) {
-              throw e;
+              throw new Meteor.Error(e.error, e.reason);
             }
             // @ts-ignore
             runHook(hooks.onErrorResolve, e, data, parsed);
@@ -143,7 +142,7 @@ export const createMethod =
     (args?: z.input<Schema>): UseSuspenseQueryResult<Awaited<Result>, Error> => {
       return useSuspenseQuery({
         queryKey: [call.config.name, args],
-        queryFn: () => call(args)
+        queryFn: () => call(args),
       });
     }
 
