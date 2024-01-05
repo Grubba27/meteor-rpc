@@ -1,10 +1,5 @@
 import { Schema, z } from "zod";
-import {
-  Config,
-  Resolver,
-  ReturnMethod,
-  ReturnSubscription,
-} from "../types";
+import { Config, Resolver, ReturnMethod, ReturnSubscription } from "../types";
 import { createMethod, createPublication } from "../server-main";
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
 
@@ -13,7 +8,8 @@ export const createModule = <
   Submodules extends Record<string, unknown> = {}
 >(
   prefix?: RouteName,
-  subModules?: Submodules
+  subModules?: Submodules,
+  middlewares: Array<(raw: unknown, parsed: unknown) => void> = []
 ) => {
   const addMethod = <
     Name extends string,
@@ -40,10 +36,22 @@ export const createModule = <
             T
           >
         >
-    >(prefix, {
-      ...subModules,
-      ...obj,
-    } as Submodules & Record<Name, ReturnMethod<RouteName extends undefined ? Name : `${RouteName}.${Name}`, Schema, T>>);
+    >(
+      prefix,
+      {
+        ...subModules,
+        ...obj,
+      } as Submodules &
+        Record<
+          Name,
+          ReturnMethod<
+            RouteName extends undefined ? Name : `${RouteName}.${Name}`,
+            Schema,
+            T
+          >
+        >,
+      middlewares
+    );
   };
 
   const addPublication = <
@@ -74,10 +82,22 @@ export const createModule = <
             T
           >
         >
-    >(prefix, {
-      ...subModules,
-      ...obj,
-    } as Submodules & Record<Name, ReturnSubscription<RouteName extends undefined ? Name : `${RouteName}.${Name}`, Schema, T>>);
+    >(
+      prefix,
+      {
+        ...subModules,
+        ...obj,
+      } as Submodules &
+        Record<
+          Name,
+          ReturnSubscription<
+            RouteName extends undefined ? Name : `${RouteName}.${Name}`,
+            Schema,
+            T
+          >
+        >,
+      middlewares
+    );
   };
 
   const addSubmodule = <
@@ -91,29 +111,47 @@ export const createModule = <
     submodule: T;
   }) => {
     const obj = { [name]: submodule };
-    return createModule<RouteName, Submodules & Record<Name, T>>(prefix, {
-      ...subModules,
-      ...obj,
-    } as Submodules & Record<Name, T>);
+    return createModule<RouteName, Submodules & Record<Name, T>>(
+      prefix,
+      {
+        ...subModules,
+        ...obj,
+      } as Submodules & Record<Name, T>,
+      middlewares
+    );
   };
 
-  let __middlewares: Array<(raw: unknown, parsed: unknown) => void> = [];
-
-  const middlewares = (fns: Array<(raw: unknown, parsed: unknown) => void>) => {
-    __middlewares.push(...fns);
-    return createModule<RouteName, Submodules>(prefix, subModules);
+  const addMiddlewares = (
+    fns: Array<(raw: unknown, parsed: unknown) => void>
+  ) => {
+    return createModule<RouteName, Submodules>(prefix, subModules, [
+      ...middlewares,
+      ...fns,
+    ]);
   };
 
+  const _addHookToMethod = (method: any) => {
+    for (const fn of middlewares) {
+      // @ts-ignore
+      method.addBeforeResolveHook(fn);
+    }
+  }
   const _applyMiddlewares = () => {
     if (!subModules) throw new Error("no keys");
     for (const name of Object.keys(subModules)) {
-      const method = subModules[name];
+      const methodOrModule = subModules[name];
+      console.log("outside of if", { methodOrModule, middlewares });
+      console.log("Type of method", typeof methodOrModule);
       // @ts-ignore
-      if (method.addBeforeResolveHook) {
-        for (const fn of __middlewares) {
-          // @ts-ignore
-          method.addBeforeResolveHook(fn);
-        }
+      if (methodOrModule.addBeforeResolveHook) {
+        console.log("inside of if", { methodOrModule, middlewares });
+        _addHookToMethod(methodOrModule);
+      }
+
+      if (typeof methodOrModule === "object") { // now is module
+        // recursively call _addHookToMethod
+
+
       }
     }
   };
@@ -135,66 +173,13 @@ export const createModule = <
     };
   };
 
-  const safeBuild = () => {
-    const setResolvers =
-      // @ts-ignore
-      <
-        Schema extends z.ZodUndefined | z.ZodTypeAny,
-        Result,
-        Resolvers extends Partial<{
-          [k in keyof Submodules]: (
-            args: z.input<Submodules[k]["config"]["schema"]>
-          ) => Submodules[k]["config"]["__result"];
-        }>
-      >(
-        resolvers: Resolvers
-      ) => {
-        Object.keys(resolvers).forEach(
-          (key: keyof Submodules & keyof Resolvers & string) => {
-            const resolver = resolvers[key] as (
-              args: z.input<Schema>
-            ) => Result;
-            if (subModules === undefined) {
-              throw new Error(`Resolver ${key} is not defined`);
-            }
-            const method = subModules[key] as ReturnMethod<
-              RouteName extends undefined
-                ? typeof key
-                : `${RouteName}.${typeof key}`,
-              Schema,
-              Result
-            >;
-            if (subModules[key]) {
-              if (resolver === undefined) {
-                throw new Error(`Resolver ${key} is not defined`);
-              }
-              method.setResolver(resolver);
-            }
-          }
-        );
-      };
 
-    return [
-      subModules as Submodules extends infer O
-        ? { [K in keyof O]: O[K] }
-        : never,
-      setResolvers,
-    ] as const;
-  };
-
-  const addMutation = addMethod;
-  const addQuery = addMethod;
   return {
     addMethod,
     addSubmodule,
-    addMutation,
-    addQuery,
     addPublication,
     build,
-    safeBuild,
     buildSubmodule,
-    middlewares,
+    addMiddlewares,
   };
 };
-
-
