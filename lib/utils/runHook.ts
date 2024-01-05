@@ -1,6 +1,6 @@
-const runHook = (hook: Array<Function>, ...args: unknown[]) => {
+const runHook = async (hook: Array<Function>, ...args: unknown[]) => {
   for (const fn of hook) {
-    fn(...args);
+    await fn(...args);
   }
 }
 export { runHook }

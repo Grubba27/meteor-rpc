@@ -24,11 +24,11 @@ export const createMethod =
     }
     if (Meteor.isServer) {
       Meteor.methods({
-        [name](data: unknown) {
+        async [name](data: unknown) {
           let parsed: z.output<Schema>;
           try {
             parsed = schema.parse(data);
-            runHook(hooks.onBeforeResolve, data, parsed);
+            await runHook(hooks.onBeforeResolve, data, parsed);
 
             if (resolver === undefined) {
               throw new Error(
@@ -48,7 +48,7 @@ export const createMethod =
               throw new Meteor.Error(e.error, e.reason);
             }
             // @ts-ignore
-            runHook(hooks.onErrorResolve, e, data, parsed);
+            await runHook(hooks.onErrorResolve, e, data, parsed);
           }
         }
       });
