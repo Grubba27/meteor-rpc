@@ -1,6 +1,5 @@
 import { Schema, z } from "zod";
 import {
-  BeforeHook,
   Config,
   Resolver,
   ReturnMethod,
@@ -102,21 +101,19 @@ export const createModule = <
 
   const middlewares = (fns: Array<(raw: unknown, parsed: unknown) => void>) => {
     __middlewares.push(...fns);
+    return createModule<RouteName, Submodules>(prefix, subModules);
   };
 
   const _applyMiddlewares = () => {
     if (!subModules) throw new Error("no keys");
-
     for (const name of Object.keys(subModules)) {
-      const methodOrModule = subModules[name];
-      if (typeof methodOrModule === "function") {
-        for (const _middleware of __middlewares) {
-          //@ts-ignore
-          methodOrModule.addBeforeResolveHook(_middleware);
+      const method = subModules[name];
+      // @ts-ignore
+      if (method.addBeforeResolveHook) {
+        for (const fn of __middlewares) {
+          // @ts-ignore
+          method.addBeforeResolveHook(fn);
         }
-      } else {
-        //@ts-ignore
-        methodOrModule.middlewares(__middlewares);
       }
     }
   };
@@ -199,4 +196,5 @@ export const createModule = <
     middlewares,
   };
 };
+
 
