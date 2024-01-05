@@ -131,27 +131,35 @@ export const createModule = <
   };
 
   const _addHookToMethod = (method: any) => {
-    for (const fn of middlewares) {
-      // @ts-ignore
-      method.addBeforeResolveHook(fn);
+    if (method.addBeforeResolveHook) {
+      for (const fn of middlewares) {
+        // @ts-ignore
+        method.addBeforeResolveHook(fn);
+      }
     }
-  }
+  };
+  const _addToObjectRecursively = (obj: any) => {
+    for (const name of Object.keys(obj)) {
+      const methodOrModule = obj[name];
+      if (typeof methodOrModule === "object") {
+        // now is module
+        // recursively call _addHookToMethod
+        _addToObjectRecursively(methodOrModule);
+      }
+      _addHookToMethod(methodOrModule);
+    }
+  };
   const _applyMiddlewares = () => {
     if (!subModules) throw new Error("no keys");
     for (const name of Object.keys(subModules)) {
       const methodOrModule = subModules[name];
-      console.log("outside of if", { methodOrModule, middlewares });
-      console.log("Type of method", typeof methodOrModule);
       // @ts-ignore
-      if (methodOrModule.addBeforeResolveHook) {
-        console.log("inside of if", { methodOrModule, middlewares });
-        _addHookToMethod(methodOrModule);
-      }
+      _addHookToMethod(methodOrModule);
 
-      if (typeof methodOrModule === "object") { // now is module
+      if (typeof methodOrModule === "object") {
+        // now is module
         // recursively call _addHookToMethod
-
-
+        _addToObjectRecursively(methodOrModule);
       }
     }
   };
