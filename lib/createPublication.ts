@@ -36,19 +36,16 @@ export const createPublication = <
     onErrorResolve: config?.hooks?.onErrorResolve || [],
   };
   const helperName = `${name}__helper`;
-  const methods: Record<string, () => any> = {};
-  methods[helperName] = function (...args: unknown[]) {
-    if (schema == null && args.length > 0) {
-      throw new Error("Unexpected arguments");
-    }
-    const parsed: z.output<Schema> = schema.parse(args);
-    // @ts-ignore
-    return resolver(parsed)._cursorDescription.collectionName;
-  };
-
   if (Meteor.isServer) {
     Meteor.methods({
-      ...methods,
+      [helperName]: function (...args: unknown[]) {
+        if (schema == null && args.length > 0) {
+          throw new Error("Unexpected arguments");
+        }
+        const parsed: z.output<Schema> = schema.parse(args);
+        // @ts-ignore
+        return resolver(parsed)._cursorDescription.collectionName;
+      }
     });
     Meteor.publish(name, function (args: unknown[]) {
       if (schema == null && args.length > 0) {
