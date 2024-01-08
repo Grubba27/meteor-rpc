@@ -3,6 +3,8 @@ import { Meteor } from "meteor/meteor";
 import { z } from "zod";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation as useMutationRQ } from "@tanstack/react-query";
+import { useSubscribe } from "./utils/hooks/useSubscribe";
+import useFind from "./utils/hooks/useFind";
 
 type M = ReturnType<typeof createMethod>;
 type R = Record<string, M>;
@@ -26,8 +28,6 @@ export const createSafeCaller = <T extends R>() => {
   };
 };
 
-
-
 // @ts-ignore
 export const createClient = <T>() => createProxyClient<T>() as T;
 
@@ -45,7 +45,11 @@ const createProxyClient = <T extends R, Prop = keyof T>(
     },
     apply(_1, _2, args) {
       const lastArg = path.at(-1);
-      if (lastArg === "useQuery" || lastArg === "useMutation") {
+      if (
+        lastArg === "useQuery" ||
+        lastArg === "useMutation" ||
+        lastArg === "usePublication"
+      ) {
         path = path.slice(0, -1);
       }
 
@@ -66,6 +70,19 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         return useMutationRQ({
           mutationFn: (params) => call(params),
         });
+      }
+
+      if (lastArg === "usePublication") {
+        const helperName = `${name}__helper`;
+        const { data: collName } = useSuspenseQuery({
+          queryKey: [name, args],
+          // @ts-ignore
+          queryFn: (): string => Meteor.callAsync(helperName, args),
+        });
+        useSubscribe(name);
+        // @ts-ignore
+        const coll = Meteor.connection._stores[collName]._getCollection();
+        return useFind(() => coll.find(args), [args]);
       }
 
       return call(...args);

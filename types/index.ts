@@ -109,7 +109,9 @@ type ReturnMethod<
    * @param args[z.input<Schema>] Args that comes from schema
    * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
    */
-  useQuery: (args?: z.input<Schema>) => UseSuspenseQueryResult<Awaited<Result>, Error>;
+  useQuery: (
+    args?: z.input<Schema>
+  ) => UseSuspenseQueryResult<Awaited<Result>, Error>;
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 };
 
@@ -166,6 +168,11 @@ type ReturnSubscription<
    * @function
    */
   setResolver: Resolver<Schema, DBResult>;
+
+  /**
+   * Creates a react-query useQuery hook using the context for the method
+   */
+  usePublication: () => Result;
   /**
    * Sets the type expectations for the return of resolver function.
    * Also known as Result

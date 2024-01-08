@@ -1,6 +1,6 @@
 {
   "name": "grubba-rpc",
-  "version": "0.11.13",
+  "version": "0.12.0",
   "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
@@ -18,6 +18,8 @@
   "dependencies": {
     "@tanstack/react-query": "^5.8.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "lodash.isequal": "4.5.0",
+    "lodash.remove": "4.7.0"
   }
 }
