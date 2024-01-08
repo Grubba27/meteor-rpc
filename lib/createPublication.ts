@@ -8,7 +8,7 @@ import { useSubscribe } from "./utils/hooks/useSubscribe";
 import { useFind } from "./utils/hooks/useFind";
 
 // doc this method
-
+let cachedCollectionsNames: Record<string, string> = {};
 /**
  * Creates a publication that can be called from the client, or from the server
  * @param name {string} name of the method similar to the name of Meteor.publish
@@ -39,8 +39,8 @@ export const createPublication = <
   if (Meteor.isServer) {
     Meteor.methods({
       [helperName]: function (...args: unknown[]) {
-        if (schema == null && args.length > 0) {
-          throw new Error("Unexpected arguments");
+        if (cachedCollectionsNames[helperName]) {
+          return cachedCollectionsNames[helperName];
         }
         const parsed: z.output<Schema> = schema.parse(args);
         // @ts-ignore
@@ -62,6 +62,11 @@ export const createPublication = <
 
       try {
         const result: DBResult = resolver.call(this, parsed as UnwrappedArgs);
+        try {
+          cachedCollectionsNames[helperName] =
+          // @ts-ignore
+            result._cursorDescription.collectionName;
+        } catch (e) {}
         runHook(hooks.onAfterResolve, args, parsed, result);
         return result;
       } catch (e) {
