@@ -175,7 +175,7 @@ type ReturnSubscription<
   /**
    * Creates a react-query useQuery hook using the context for the method
    */
-  usePublication: () => Result;
+  usePublication: (args: z.input<Schema>) => Result;
   /**
    * Sets the type expectations for the return of resolver function.
    * Also known as Result
