@@ -4,7 +4,7 @@ import { isThenable } from './utils/isThenable'
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
 import { Meteor } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
-import { UseMutationResult, UseSuspenseQueryResult, useMutation as useMutationRQ } from "@tanstack/react-query";
+import { UseMutationOptions, UseMutationResult, UseSuspenseQueryOptions, UseSuspenseQueryResult, useMutation as useMutationRQ } from "@tanstack/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 
 /**
@@ -127,24 +127,30 @@ export const createMethod =
      * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
      */
     call.useMutation =
-    (): UseMutationResult<Result, Error, z.input<Schema>> => {
+    (options?: UseMutationOptions<Result, Error, z.input<Schema>, unknown>): UseMutationResult<Result, Error, z.input<Schema>> => {
+
       return useMutationRQ({
+        ...options,
         mutationFn: (params) => call(params),
       });
     };
 
     /**
      * Creates a react-query useQuery hook using the context for the method
-     * @param args[z.input<Schema>] Args that comes from schema
+     * @param {[z.input<Schema>]} Args that comes from schema
+     * @param {{useQueryOptions: UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]>}} UseQueryOptions Options for react-query useQuery hook
      * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
      */
-    call.useQuery =
-    (args?: z.input<Schema>): UseSuspenseQueryResult<Awaited<Result>, Error> => {
+    call.useQuery = (
+      args?: z.input<Schema>,
+     { useQueryOptions }: { useQueryOptions?: UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]> } = {}
+    ): UseSuspenseQueryResult<Awaited<Result>, Error> => {
       return useSuspenseQuery({
-        queryKey: [call.config.name, args],
+        ...useQueryOptions,
         queryFn: () => call(args),
+        queryKey: [call.config.name, args],
       });
-    }
+    };
 
 
     return call as ReturnMethod<Name, Schema, Result>;
@@ -152,3 +158,6 @@ export const createMethod =
 
 export const createMutation = createMethod;
 export const createQuery = createMethod;
+
+const t  = createMethod("test", z.string(), () => "test", )
+

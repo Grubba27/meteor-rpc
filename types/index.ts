@@ -1,5 +1,7 @@
 import {
+  UseMutationOptions,
   UseMutationResult,
+  UseSuspenseQueryOptions,
   UseSuspenseQueryResult,
 } from "@tanstack/react-query";
 import { Meteor } from "meteor/meteor";
@@ -102,7 +104,7 @@ type ReturnMethod<
    * Creates a react-query useMutation hook using the context for the method
    * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
    */
-  useMutation: () => UseMutationResult<Result, Error, z.input<Schema>>;
+  useMutation: (options?: UseMutationOptions<Result, Error, z.input<Schema>, unknown>) => UseMutationResult<Result, Error, z.input<Schema>>;
 
   /**
    * Creates a react-query useQuery hook using the context for the method
@@ -110,7 +112,8 @@ type ReturnMethod<
    * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
    */
   useQuery: (
-    args?: z.input<Schema>
+    args?: z.input<Schema>,
+    { useQueryOptions }?: { useQueryOptions?: Omit<UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]>, "queryKey" | "queryFn"> }
   ) => UseSuspenseQueryResult<Awaited<Result>, Error>;
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 };

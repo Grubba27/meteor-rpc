@@ -44,11 +44,11 @@ const createProxyClient = <T extends R, Prop = keyof T>(
       return createProxyClient([...path, key]);
     },
     apply(_1, _2, args) {
-      const lastArg = path.at(-1);
+      const lastPath = path.at(-1);
       if (
-        lastArg === "useQuery" ||
-        lastArg === "useMutation" ||
-        lastArg === "usePublication"
+        lastPath === "useQuery" ||
+        lastPath === "useMutation" ||
+        lastPath === "usePublication"
       ) {
         path = path.slice(0, -1);
       }
@@ -59,20 +59,36 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         return Meteor.callAsync(name, ...params);
       }
 
-      if (lastArg === "useQuery") {
+      if (lastPath === "useQuery") {
+        const lastArg = args.at(-1);
+        if (typeof lastArg === "object" && lastArg?.useQueryOptions) {
+          const __args = args.slice(0, -1);
+          return useSuspenseQuery({
+            ...lastArg.useQueryOptions,
+            queryKey: [name, ...__args],
+            queryFn: () => call(...__args),
+          });
+        }
         return useSuspenseQuery({
           queryKey: [name, ...args],
           queryFn: () => call(...args),
         });
       }
 
-      if (lastArg === "useMutation") {
+      if (lastPath === "useMutation") {
+        const lastArg = args.at(-1);
+        if (typeof lastArg === "object" ) {
+          return useMutationRQ({
+            ...lastArg,
+            mutationFn: (params) => call(params),
+          });
+        }
         return useMutationRQ({
           mutationFn: (params) => call(params),
         });
       }
 
-      if (lastArg === "usePublication") {
+      if (lastPath === "usePublication") {
         const helperName = `${name}__helper`;
         const { data: collName } = useSuspenseQuery({
           queryKey: [name, args],
