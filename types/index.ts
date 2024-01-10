@@ -108,7 +108,9 @@ type ReturnMethod<
 
   /**
    * Creates a react-query useQuery hook using the context for the method
-   * @param args[z.input<Schema>] Args that comes from schema
+  * @param {[z.input<Schema>]} Args that comes from schema
+   * @param {{useQueryOptions: UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]>}} UseQueryOptions Options for react-query useQuery hook
+   *
    * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
    */
   useQuery: (
