@@ -54,8 +54,9 @@ const createProxyClient = <T extends R, Prop = keyof T>(
       }
 
       const name = path.join(".");
-
+      // @ts-ignore
       function call(...params) {
+        // @ts-ignore
         return Meteor.callAsync(name, ...params);
       }
 
@@ -77,7 +78,7 @@ const createProxyClient = <T extends R, Prop = keyof T>(
 
       if (lastPath === "useMutation") {
         const lastArg = args.at(-1);
-        if (typeof lastArg === "object" ) {
+        if (typeof lastArg === "object") {
           return useMutationRQ({
             ...lastArg,
             mutationFn: (params) => call(params),
