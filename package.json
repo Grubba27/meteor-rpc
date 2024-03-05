@@ -4,6 +4,8 @@
   "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
+    "@types/lodash.isequal": "^4.5.8",
+    "@types/lodash.remove": "^4.7.9",
     "@types/meteor": "^2.7.1",
     "typescript": "^4.7.4",
     "zod": "^3.18.0"
@@ -17,9 +19,9 @@
   "license": "MIT",
   "dependencies": {
     "@tanstack/react-query": "^5.8.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "lodash.isequal": "4.5.0",
-    "lodash.remove": "4.7.0"
+    "lodash.remove": "4.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

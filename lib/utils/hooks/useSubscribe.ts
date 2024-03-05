@@ -1,67 +1,75 @@
-import { useEffect } from 'react'
-import { EJSON } from 'meteor/ejson'
-import { Meteor } from 'meteor/meteor'
-import isEqual from 'lodash.isequal'
-import remove from 'lodash.remove'
+import { useEffect } from "react";
+import { EJSON } from "meteor/ejson";
+import { Meteor } from "meteor/meteor";
+import isEqual from "lodash.isequal";
+import remove from "lodash.remove";
 
-const cachedSubscriptions: Entry[] = []
+const cachedSubscriptions: Entry[] = [];
 
 interface Entry {
-  params: EJSON[]
-  name: string
-  handle?: Meteor.SubscriptionHandle
-  promise: Promise<void>
-  result?: null
-  error?: unknown
+  params: EJSON[];
+  name: string;
+  handle?: Meteor.SubscriptionHandle;
+  promise: Promise<void>;
+  result?: null;
+  error?: unknown;
 }
 
 export function useSubscribeSuspense(name: string, ...params: EJSON[]) {
-  const cachedSubscription =
-    cachedSubscriptions.find(x => x.name === name && isEqual(x.params, params))
+  const cachedSubscription = cachedSubscriptions.find(
+    (x) => x.name === name && isEqual(x.params, params)
+  );
 
-  useEffect(() =>
-    () => {
+  useEffect(
+    () => () => {
       setTimeout(() => {
-        const cachedSubscription =
-          cachedSubscriptions.find(x => x.name === name && isEqual(x.params, params))
+        const cachedSubscription = cachedSubscriptions.find(
+          (x) => x.name === name && isEqual(x.params, params)
+        );
         if (cachedSubscription) {
-          cachedSubscription.handle?.stop()
-          remove(cachedSubscriptions,
-            x =>
+          cachedSubscription.handle?.stop();
+          remove(
+            cachedSubscriptions,
+            // @ts-ignore
+            (x) =>
               x.name === cachedSubscription.name &&
-              isEqual(x.params, cachedSubscription.params))
+              isEqual(x.params, cachedSubscription.params)
+          );
         }
-      }, 0)
-    }, [name, ...params])
+      }, 0);
+    },
+    [name, ...params]
+  );
 
   if (cachedSubscription != null) {
-    if ('error' in cachedSubscription) throw cachedSubscription.error
-    if ('result' in cachedSubscription) return cachedSubscription.result
-    throw cachedSubscription.promise
+    if ("error" in cachedSubscription) throw cachedSubscription.error;
+    if ("result" in cachedSubscription) return cachedSubscription.result;
+    throw cachedSubscription.promise;
   }
 
   const subscription: Entry = {
     name,
     params,
+    // @ts-ignore
     promise: new Promise<Meteor.SubscriptionHandle>((resolve, reject) => {
       const h = Meteor.subscribe(name, ...params, {
         onReady() {
-          subscription.result = null
-          subscription.handle = h
-          resolve(h)
+          subscription.result = null;
+          subscription.handle = h;
+          resolve(h);
         },
         onStop(error: unknown) {
-          subscription.error = error
-          subscription.handle = h
-          reject(error)
-        }
-      })
-    })
-  }
+          subscription.error = error;
+          subscription.handle = h;
+          reject(error);
+        },
+      });
+    }),
+  };
 
-  cachedSubscriptions.push(subscription)
+  cachedSubscriptions.push(subscription);
 
-  throw subscription.promise
+  throw subscription.promise;
 }
 
-export const useSubscribe = useSubscribeSuspense
+export const useSubscribe = useSubscribeSuspense;

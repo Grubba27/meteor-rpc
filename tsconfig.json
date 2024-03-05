@@ -1,17 +1,13 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "lib": [
-      "DOM",
-      "ESNext"
-    ],
+    "lib": ["DOM", "ESNext"],
     "module": "ES6",
     "moduleResolution": "node",
     "noEmit": true,
     "strict": true,
-    "target": "ESNext"
+    "target": "ESNext",
+    "skipLibCheck": true
   },
-  "files": [
-    "./server-main.ts",
-  ]
+  "files": ["./server-main.ts"]
 }
