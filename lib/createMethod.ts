@@ -56,7 +56,7 @@ export const createMethod = <
           if (isThenable(result)) {
             result.then((res) => {
               runHook(hooks.onAfterResolve, data, parsed, res);
-            });
+            }).catch(e => e);
           } else runHook(hooks.onAfterResolve, data, parsed, result);
           return await result;
         } catch (e: Meteor.Error | Error | unknown) {
