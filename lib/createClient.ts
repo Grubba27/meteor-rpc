@@ -55,11 +55,14 @@ const createProxyClient = <T extends R, Prop = keyof T>(
 
       const name = path.join(".");
       // @ts-ignore
-      function call(...params) {
+      async function call(...params) {
         // @ts-ignore
-        return Meteor.callAsync(name, ...params);
+        const result = await Meteor.callAsync(name, ...params);
+        if (Object.hasOwn(result, "__isError__")) {
+          throw new Meteor.Error(result.error, result.reason);
+        }
+        return result;
       }
-
       if (lastPath === "useQuery") {
         const lastArg = args.at(-1);
         if (typeof lastArg === "object" && lastArg?.useQueryOptions) {

@@ -62,7 +62,7 @@ export const createMethod = <
         } catch (e: Meteor.Error | Error | unknown) {
           if (!hooks.onErrorResolve.length) {
             // @ts-ignore
-            throw new Meteor.Error(e.error, e.reason);
+            return { __isError__: true, error: e.error, reason: e.reason };
           }
           // @ts-ignore
           await runHook(hooks.onErrorResolve, e, data, parsed);
