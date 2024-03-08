@@ -59,9 +59,7 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         // @ts-ignore
         const result = await Meteor.callAsync(name, ...params);
         if (result && Object.hasOwn(result, "__isError__")) {
-          if (Object.hasOwn(result, "__isError__")) {
-            return Promise.reject(result);
-          }
+            throw new Meteor.Error(result.error, result.reason);
         }
         return result;
       }
