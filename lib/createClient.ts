@@ -61,6 +61,11 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         if (result && Object.hasOwn(result, "__isError__")) {
             throw new Meteor.Error(result.error, result.reason);
         }
+
+        if(result && Object.hasOwn(result, "errorType") && result.errorType === "Meteor.Error") {
+          throw new Meteor.Error(result.error, result.reason);
+        }
+
         return result;
       }
       if (lastPath === "useQuery") {
