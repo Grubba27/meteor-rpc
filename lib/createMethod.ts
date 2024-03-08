@@ -58,7 +58,7 @@ export const createMethod = <
               runHook(hooks.onAfterResolve, data, parsed, res);
             });
           } else runHook(hooks.onAfterResolve, data, parsed, result);
-          return result;
+          return await result;
         } catch (e: Meteor.Error | Error | unknown) {
           if (!hooks.onErrorResolve.length) {
             // @ts-ignore
