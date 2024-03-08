@@ -15,8 +15,7 @@ This package provides functions for building E2E type-safe RPCs. The functions a
 ## How to download it?
 
 ```bash
-meteor npm i grubba-rpc
-meteor npm i zod
+meteor npm i grubba-rpc @tanstack/react-query zod
 ```
 
 ## How to use it?
