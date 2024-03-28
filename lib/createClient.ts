@@ -29,90 +29,113 @@ export const createSafeCaller = <T extends R>() => {
 };
 
 // @ts-ignore
-export const createClient = <T>() => createProxyClient<T>() as T;
+export const createClient = <T, t>(target: t) => createProxyClient<T>({
+  target
+}) as T & t;
 
 const createProxyClient = <T extends R, Prop = keyof T>(
-  path: string[] = []
+  {
+    path,
+    target,
+  }: {
+    path: string[];
+    target: {};
+  } = {
+    path: [],
+    target: {},
+  }
 ) => {
-  const proxy = new Proxy(() => {}, {
-    get(_, key: string) {
-      if (typeof key !== "string" || key === "then" || key === "toJSON") {
-        // special case for if the proxy is accidentally treated
-        // like a PromiseLike (like in `Promise.resolve(proxy)`)
-        return undefined;
-      }
-      return createProxyClient([...path, key]);
+  const proxy = new Proxy(
+    () => {
+      return target as unknown as T;
     },
-    apply(_1, _2, args) {
-      const lastPath = path.at(-1);
-      if (
-        lastPath === "useQuery" ||
-        lastPath === "useMutation" ||
-        lastPath === "usePublication"
-      ) {
-        path = path.slice(0, -1);
-      }
+    {
+      get(_, key: string) {
+        if (typeof key !== "string" || key === "then" || key === "toJSON") {
+          // special case for if the proxy is accidentally treated
+          // like a PromiseLike (like in `Promise.resolve(proxy)`)
+          return undefined;
+        }
+        return createProxyClient({
+          path: [...path, key],
+          target,
+        });
+      },
+      apply(_1, _2, args) {
+        const lastPath = path.at(-1);
+        if (
+          lastPath === "useQuery" ||
+          lastPath === "useMutation" ||
+          lastPath === "usePublication"
+        ) {
+          path = path.slice(0, -1);
+        }
 
-      const name = path.join(".");
-      // @ts-ignore
-      async function call(...params) {
+        const name = path.join(".");
         // @ts-ignore
-        const result = await Meteor.callAsync(name, ...params);
-        if (result && Object.hasOwn(result, "__isError__")) {
+        async function call(...params) {
+          // @ts-ignore
+          const result = await Meteor.callAsync(name, ...params);
+          if (result && Object.hasOwn(result, "__isError__")) {
             throw new Meteor.Error(result.error, result.reason);
-        }
+          }
 
-        if(result && Object.hasOwn(result, "errorType") && result.errorType === "Meteor.Error") {
-          throw new Meteor.Error(result.error, result.reason);
-        }
+          if (
+            result &&
+            Object.hasOwn(result, "errorType") &&
+            result.errorType === "Meteor.Error"
+          ) {
+            throw new Meteor.Error(result.error, result.reason);
+          }
 
-        return result;
-      }
-      if (lastPath === "useQuery") {
-        const lastArg = args.at(-1);
-        if (typeof lastArg === "object" && lastArg?.useQueryOptions) {
-          const __args = args.slice(0, -1);
+          return result;
+        }
+        if (lastPath === "useQuery") {
+          const lastArg = args.at(-1);
+          if (typeof lastArg === "object" && lastArg?.useQueryOptions) {
+            const __args = args.slice(0, -1);
+            return useSuspenseQuery({
+              ...lastArg.useQueryOptions,
+              queryKey: [name, ...__args],
+              queryFn: () => call(...__args),
+            });
+          }
           return useSuspenseQuery({
-            ...lastArg.useQueryOptions,
-            queryKey: [name, ...__args],
-            queryFn: () => call(...__args),
+            queryKey: [name, ...args],
+            queryFn: () => call(...args),
           });
         }
-        return useSuspenseQuery({
-          queryKey: [name, ...args],
-          queryFn: () => call(...args),
-        });
-      }
 
-      if (lastPath === "useMutation") {
-        const lastArg = args.at(-1);
-        if (typeof lastArg === "object") {
+        if (lastPath === "useMutation") {
+          const lastArg = args.at(-1);
+          if (typeof lastArg === "object") {
+            return useMutationRQ({
+              ...lastArg,
+              mutationFn: (params) => call(params),
+            });
+          }
           return useMutationRQ({
-            ...lastArg,
             mutationFn: (params) => call(params),
           });
         }
-        return useMutationRQ({
-          mutationFn: (params) => call(params),
-        });
-      }
 
-      if (lastPath === "usePublication") {
-        const helperName = `${name}__helper`;
-        const { data: collName } = useSuspenseQuery({
-          queryKey: [name, args],
+        if (lastPath === "usePublication") {
+          const helperName = `${name}__helper`;
+          const { data: collName } = useSuspenseQuery({
+            queryKey: [name, args],
+            // @ts-ignore
+            queryFn: (): string => Meteor.callAsync(helperName, args),
+          });
+          useSubscribe(name);
           // @ts-ignore
-          queryFn: (): string => Meteor.callAsync(helperName, args),
-        });
-        useSubscribe(name);
-        // @ts-ignore
-        const coll = Meteor.connection._stores[collName]._getCollection();
-        return useFind(() => coll.find(args), [args]);
-      }
+          const coll = Meteor.connection._stores[collName]._getCollection();
+          return useFind(() => coll.find(args), [args]);
+        }
 
-      return call(...args);
-    },
-  }) as unknown as T;
+        return call(...args);
+      },
+    }
+  ) as unknown as T;
 
   return proxy;
 };
