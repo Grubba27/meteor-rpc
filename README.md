@@ -13,6 +13,8 @@ This package provides functions for building E2E type-safe RPCs.
 meteor npm i grubba-rpc @tanstack/react-query zod
 ```
 
+install react query into your project, following their [quick start guide](https://tanstack.com/query/latest/docs/framework/react/quick-start)
+
 ## How to use it?
 
 ### createModule
@@ -85,7 +87,6 @@ app.foo("str"); // <--- This is type safe
 app.other.bar("str"); // <--- This is type safe
 ```
 
-
 ## Advanced usage
 
 ### Advanced usage
@@ -117,7 +118,6 @@ addMethod("name", z.any(), () => "str", {
 or
 
 ```ts
-
 // server.ts
 server.name.addBeforeResolveHook((raw, parsed) => {
   console.log("before resolve", raw, parsed);
@@ -132,10 +132,7 @@ server.name.addErrorResolveHook((err, raw, parsed) => {
 });
 
 server = server.build();
-
-
 ```
-
 
 ## Legacy API:
 
