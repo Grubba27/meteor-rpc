@@ -66,7 +66,7 @@ export const createModule = <
   >(
     name: Name,
     schema: Schema,
-    resolver: (this: MeteorSubscription, args: UnwrappedArgs) => Mongo.Cursor<T>,
+    resolver: (this: MeteorSubscription, args: UnwrappedArgs) => Mongo.Cursor<T> | Promise<Mongo.Cursor<T>>,
     config?: Config<UnwrappedArgs, T>
   ) => {
     const nameWithPrefix = prefix ? `${prefix}.${name}` : name;

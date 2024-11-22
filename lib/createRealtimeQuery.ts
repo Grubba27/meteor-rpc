@@ -18,18 +18,18 @@ export const createRealtimeQuery = <
   resolver: (
     this: MeteorSubscription,
     args: z.input<Schema>
-  ) => Mongo.Cursor<Result>,
+  ) => Mongo.Cursor<Result> | Promise<Mongo.Cursor<Result>>,
   config?: Config<UnwrappedArgs, Result>
 ) => {
   if (Meteor.isServer) {
-    Meteor.publish(name, function (...args: unknown[]) {
+    Meteor.publish(name, async function (args: unknown[]) {
       const parsed: z.output<Schema> = schema.parse(args);
 
       const clientCollection = name;
 
-      const cursor = resolver.call(this, parsed);
+      const cursor = await resolver.call(this, parsed);
 
-      const observerHandle = cursor.observeChanges({
+      const observerHandle = await cursor.observeChanges({
         added: (_id, fields) => {
           // console.log('Added:', _id, fields);
           this.added(clientCollection, _id, fields);

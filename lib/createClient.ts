@@ -8,7 +8,7 @@ import useFind from "./utils/hooks/useFind";
 import { Mongo } from "meteor/mongo";
 type M = ReturnType<typeof createMethod>;
 type R = Record<string, M>;
-
+const collectionMap = new Map<string, Mongo.Collection<any>>();
 export const createSafeCaller = <T extends R>() => {
   return {
     call<P extends keyof T>(
@@ -29,38 +29,21 @@ export const createSafeCaller = <T extends R>() => {
 };
 
 // @ts-ignore
-export const createClient = <T, t>(target: t) =>
-  createProxyClient<T>({
-    target,
-  }) as T & t;
+export const createClient = <T, t>(target: t) => createProxyClient<T>() as T & t;
 
 const createProxyClient = <T extends R, Prop = keyof T>(
-  {
-    path,
-    target,
-  }: {
-    path: string[];
-    target: {};
-  } = {
-    path: [],
-    target: {},
-  }
+  path: string[] = [],
 ) => {
   const proxy = new Proxy(
-    () => {
-      return target as unknown as T;
-    },
+    () => {},
     {
       get(_, key: string) {
-        if (typeof key !== "string" || key === "then" || key === "toJSON") {
+        if (typeof key !== "string" || key === "then" || key === "toJSON" || key === "prototype") {
           // special case for if the proxy is accidentally treated
           // like a PromiseLike (like in `Promise.resolve(proxy)`)
           return undefined;
         }
-        return createProxyClient({
-          path: [...path, key],
-          target,
-        });
+        return createProxyClient([...path, key]);
       },
       apply(_1, _2, args) {
         const lastPath = path.at(-1);
@@ -121,9 +104,16 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         }
 
         if (lastPath === "usePublication") {
-          const coll = new Mongo.Collection(name);
-          useSubscribe(name);
-          return useFind(() => coll.find(args), [args]);
+          let coll: Mongo.Collection<any>;
+          if (collectionMap.has(name)) {
+            coll = collectionMap.get(name) as Mongo.Collection<any>;
+          } else {
+            coll = new Mongo.Collection(name);
+            collectionMap.set(name, coll);
+          }
+
+          useSubscribe(name, ...args);
+          return useFind(() => coll.find(), []);
         }
 
         return call(...args);
