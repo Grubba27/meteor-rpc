@@ -5,7 +5,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation as useMutationRQ } from "@tanstack/react-query";
 import { useSubscribe } from "./utils/hooks/useSubscribe";
 import useFind from "./utils/hooks/useFind";
-
+import { Mongo } from "meteor/mongo";
 type M = ReturnType<typeof createMethod>;
 type R = Record<string, M>;
 
@@ -29,9 +29,10 @@ export const createSafeCaller = <T extends R>() => {
 };
 
 // @ts-ignore
-export const createClient = <T, t>(target: t) => createProxyClient<T>({
-  target
-}) as T & t;
+export const createClient = <T, t>(target: t) =>
+  createProxyClient<T>({
+    target,
+  }) as T & t;
 
 const createProxyClient = <T extends R, Prop = keyof T>(
   {
@@ -120,15 +121,8 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         }
 
         if (lastPath === "usePublication") {
-          const helperName = `${name}__helper`;
-          const { data: collName } = useSuspenseQuery({
-            queryKey: [name, args],
-            // @ts-ignore
-            queryFn: (): string => Meteor.callAsync(helperName, args),
-          });
+          const coll = new Mongo.Collection(name);
           useSubscribe(name);
-          // @ts-ignore
-          const coll = Meteor.connection._stores[collName]._getCollection();
           return useFind(() => coll.find(args), [args]);
         }
 
