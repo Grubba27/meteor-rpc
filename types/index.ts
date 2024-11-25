@@ -5,6 +5,7 @@ import {
   UseSuspenseQueryResult,
 } from "@tanstack/react-query";
 import { Meteor } from "meteor/meteor";
+import { Mongo } from "meteor/mongo";
 import { z } from "zod";
 
 type BeforeHook<Schema extends z.ZodUndefined | z.ZodTypeAny> = (
@@ -104,18 +105,32 @@ type ReturnMethod<
    * Creates a react-query useMutation hook using the context for the method
    * @returns {UseMutationResult<Result, Error, z.input<Schema>>} react-query useMutation hook
    */
-  useMutation: (options?: UseMutationOptions<Result, Error, z.input<Schema>, unknown>) => UseMutationResult<Result, Error, z.input<Schema>>;
+  useMutation: (
+    options?: UseMutationOptions<Result, Error, z.input<Schema>, unknown>
+  ) => UseMutationResult<Result, Error, z.input<Schema>>;
 
   /**
    * Creates a react-query useQuery hook using the context for the method
-  * @param {[z.input<Schema>]} Args that comes from schema
+   * @param {[z.input<Schema>]} Args that comes from schema
    * @param {{useQueryOptions: UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]>}} UseQueryOptions Options for react-query useQuery hook
    *
    * @returns{UseSuspenseQueryResult<Result, Error>} react-query useQuery hook
    */
   useQuery: (
     args?: z.input<Schema>,
-    { useQueryOptions }?: { useQueryOptions?: Omit<UseSuspenseQueryOptions<Result, Error, Awaited<Result>, (z.input<Schema> | Name | undefined)[]>, "queryKey" | "queryFn"> }
+    {
+      useQueryOptions,
+    }?: {
+      useQueryOptions?: Omit<
+        UseSuspenseQueryOptions<
+          Result,
+          Error,
+          Awaited<Result>,
+          (z.input<Schema> | Name | undefined)[]
+        >,
+        "queryKey" | "queryFn"
+      >;
+    }
   ) => UseSuspenseQueryResult<Awaited<Result>, Error>;
   <T>(args?: z.input<Schema>): Promise<Result> & Promise<T>;
 };
@@ -177,7 +192,11 @@ type ReturnSubscription<
   /**
    * Creates a react-query useQuery hook using the context for the method
    */
-  usePublication: (args: z.input<Schema>) => Result;
+  usePublication: (args: z.input<Schema>) => {
+    data: Result[];
+    // @ts-ignore
+    collection: Mongo.Collection<Result>;
+  };
   /**
    * Sets the type expectations for the return of resolver function.
    * Also known as Result
