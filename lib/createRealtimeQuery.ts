@@ -8,6 +8,7 @@ import { Mongo } from "meteor/mongo";
 export const createRealtimeQuery = <
   Name extends string,
   Schema extends z.ZodUndefined | z.ZodTypeAny,
+  // @ts-ignore
   Result,
   UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
     ? []
@@ -52,6 +53,7 @@ export const createRealtimeQuery = <
     });
   }
   function query(args: z.input<Schema>) {
+    // @ts-ignore
     return new Mongo.Collection<Result>(name).find(
       args
     ) as unknown as Mongo.Cursor<Result>;
