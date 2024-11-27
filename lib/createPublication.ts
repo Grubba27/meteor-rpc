@@ -23,6 +23,7 @@ export const createPublication = <
   Name extends string,
   Schema extends z.ZodUndefined | z.ZodTypeAny,
   Result,
+  // @ts-ignore
   DBResult = Mongo.Cursor<Result>,
   UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
     ? []
@@ -50,6 +51,7 @@ export const createPublication = <
         return resolver(parsed)._cursorDescription.collectionName;
       },
     });
+    // @ts-ignore
     Meteor.publish(name, function (args: unknown[]) {
       if (schema == null && args.length > 0) {
         throw new Error("Unexpected arguments");
@@ -145,7 +147,9 @@ export const createPublication = <
    * Also known as Result
    * @function
    */
+  // @ts-ignore
   subscribe.expect = <T extends Result, SchemaResult extends Result = Result>(
+    // @ts-ignore
     newSchema?: SchemaResult
   ): ReturnSubscription<Name, Schema, Result> => {
     return subscribe as unknown as ReturnSubscription<Name, Schema, Result>;

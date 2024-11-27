@@ -24,10 +24,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 export const createMethod = <
   Name extends string,
   Schema extends z.ZodUndefined | z.ZodTypeAny,
-  Result,
-  UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
-    ? []
-    : [z.input<Schema>]
+  Result
 >(
   name: Name,
   schema: Schema,
@@ -55,9 +52,11 @@ export const createMethod = <
 
           const result: Result = resolver(parsed);
           if (isThenable(result)) {
-            result.then((res) => {
-              runHook(hooks.onAfterResolve, data, parsed, res);
-            }).catch(e => e);
+            result
+              .then((res) => {
+                runHook(hooks.onAfterResolve, data, parsed, res);
+              })
+              .catch((e) => e);
           } else runHook(hooks.onAfterResolve, data, parsed, result);
           return await result;
         } catch (e: Meteor.Error | Error | unknown) {
@@ -129,7 +128,9 @@ export const createMethod = <
    * Also known as Result
    * @function
    */
+  // @ts-ignore
   call.expect = <T extends Result, SchemaResult extends Result = Result>(
+    // @ts-ignore
     expectedSchema?: SchemaResult
   ): ReturnMethod<Name, Schema, Result> => {
     return call as ReturnMethod<Name, Schema, Result>;
@@ -140,7 +141,9 @@ export const createMethod = <
    * Also known as Result
    * @function
    */
+  // @ts-ignore
   call.returns = <T extends Result, SchemaResult extends Result = Result>(
+    // @ts-ignore
     expectedSchema?: SchemaResult
   ): ReturnMethod<Name, Schema, Result> => {
     return call as ReturnMethod<Name, Schema, Result>;
@@ -189,5 +192,3 @@ export const createMethod = <
 
 export const createMutation = createMethod;
 export const createQuery = createMethod;
-
-const t = createMethod("test", z.string(), () => "test");

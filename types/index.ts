@@ -30,6 +30,7 @@ type ReturnMethod<
   Name extends string,
   Schema extends z.ZodUndefined | z.ZodTypeAny,
   Result,
+  // @ts-ignore
   UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
     ? []
     : [z.input<Schema>]
@@ -142,6 +143,7 @@ type ReturnSubscription<
   Schema extends z.ZodTuple | z.ZodTypeAny,
   Result,
   DBResult extends Mongo.Cursor<Result> = Mongo.Cursor<Result>,
+  // @ts-ignore
   UnwrappedArgs extends unknown[] = Schema extends z.ZodTuple
     ? z.infer<Schema>
     : []

@@ -149,6 +149,7 @@ const useFindClient = <T = any>(factory: () => (Mongo.Cursor<T> | undefined | nu
   return cursor ? data : cursor
 }
 
+// @ts-ignore
 const useFindServer = <T = any>(factory: () => Mongo.Cursor<T> | undefined | null, deps: DependencyList) => (
   Tracker.nonreactive(() => {
     const cursor = factory()
