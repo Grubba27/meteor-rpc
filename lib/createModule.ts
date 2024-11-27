@@ -2,6 +2,8 @@ import { Schema, z } from "zod";
 import { Config, Resolver, ReturnMethod, ReturnSubscription } from "../types";
 import { createMethod, createPublication } from "../server-main";
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
+import { createRealtimeQuery } from "./createRealtimeQuery";
+import { Mongo } from "meteor/mongo";
 
 export const createModule = <
   RouteName extends string | undefined,
@@ -64,12 +66,12 @@ export const createModule = <
   >(
     name: Name,
     schema: Schema,
-    resolver: (this: MeteorSubscription, args: UnwrappedArgs) => T,
+    resolver: (this: MeteorSubscription, args: UnwrappedArgs) => Mongo.Cursor<T> | Promise<Mongo.Cursor<T>>,
     config?: Config<UnwrappedArgs, T>
   ) => {
     const nameWithPrefix = prefix ? `${prefix}.${name}` : name;
     const obj = {
-      [name]: createPublication(nameWithPrefix, schema, resolver, config),
+      [name]: createRealtimeQuery(nameWithPrefix, schema, resolver, config),
     };
     return createModule<
       RouteName,
@@ -180,7 +182,6 @@ export const createModule = <
       submodule: build(),
     };
   };
-
 
   return {
     addMethod,

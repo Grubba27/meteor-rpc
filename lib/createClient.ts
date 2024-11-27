@@ -5,10 +5,10 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation as useMutationRQ } from "@tanstack/react-query";
 import { useSubscribe } from "./utils/hooks/useSubscribe";
 import useFind from "./utils/hooks/useFind";
-
+import { Mongo } from "meteor/mongo";
 type M = ReturnType<typeof createMethod>;
 type R = Record<string, M>;
-
+const collectionMap = new Map<string, Mongo.Collection<any>>();
 export const createSafeCaller = <T extends R>() => {
   return {
     call<P extends keyof T>(
@@ -36,7 +36,12 @@ const createProxyClient = <T extends R, Prop = keyof T>(
 ) => {
   const proxy = new Proxy(() => {}, {
     get(_, key: string) {
-      if (typeof key !== "string" || key === "then" || key === "toJSON") {
+      if (
+        typeof key !== "string" ||
+        key === "then" ||
+        key === "toJSON" ||
+        key === "prototype"
+      ) {
         // special case for if the proxy is accidentally treated
         // like a PromiseLike (like in `Promise.resolve(proxy)`)
         return undefined;
@@ -59,10 +64,14 @@ const createProxyClient = <T extends R, Prop = keyof T>(
         // @ts-ignore
         const result = await Meteor.callAsync(name, ...params);
         if (result && Object.hasOwn(result, "__isError__")) {
-            throw new Meteor.Error(result.error, result.reason);
+          throw new Meteor.Error(result.error, result.reason);
         }
 
-        if(result && Object.hasOwn(result, "errorType") && result.errorType === "Meteor.Error") {
+        if (
+          result &&
+          Object.hasOwn(result, "errorType") &&
+          result.errorType === "Meteor.Error"
+        ) {
           throw new Meteor.Error(result.error, result.reason);
         }
 
@@ -98,16 +107,16 @@ const createProxyClient = <T extends R, Prop = keyof T>(
       }
 
       if (lastPath === "usePublication") {
-        const helperName = `${name}__helper`;
-        const { data: collName } = useSuspenseQuery({
-          queryKey: [name, args],
-          // @ts-ignore
-          queryFn: (): string => Meteor.callAsync(helperName, args),
-        });
-        useSubscribe(name);
-        // @ts-ignore
-        const coll = Meteor.connection._stores[collName]._getCollection();
-        return useFind(() => coll.find(args), [args]);
+        let coll: Mongo.Collection<any>;
+        if (collectionMap.has(name)) {
+          coll = collectionMap.get(name) as Mongo.Collection<any>;
+        } else {
+          coll = new Mongo.Collection(name);
+          collectionMap.set(name, coll);
+        }
+        useSubscribe(name, ...args);
+        const data = useFind(() => coll.find(), []);
+        return { data, collection: coll };
       }
 
       return call(...args);
