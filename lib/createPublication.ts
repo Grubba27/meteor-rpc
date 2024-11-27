@@ -1,11 +1,14 @@
 import { Config, ReturnSubscription, SubscriptionCallbacks } from "../types";
 import { z } from "zod";
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
+// @ts-ignore
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useSubscribe } from "./utils/hooks/useSubscribe";
 import { useFind } from "./utils/hooks/useFind";
+// @ts-ignore
+import { Mongo } from "meteor/mongo";
 
 // doc this method
 let cachedCollectionsNames: Record<string, string> = {};
@@ -45,7 +48,7 @@ export const createPublication = <
         const parsed: z.output<Schema> = schema.parse(args);
         // @ts-ignore
         return resolver(parsed)._cursorDescription.collectionName;
-      }
+      },
     });
     Meteor.publish(name, function (args: unknown[]) {
       if (schema == null && args.length > 0) {
@@ -61,10 +64,12 @@ export const createPublication = <
       }
 
       try {
-        const result: DBResult = resolver.call(this, parsed as UnwrappedArgs);
+        const result: DBResult =
+          // @ts-ignore
+          resolver.call(this, parsed as UnwrappedArgs);
         try {
           cachedCollectionsNames[helperName] =
-          // @ts-ignore
+            // @ts-ignore
             result._cursorDescription.collectionName;
         } catch (e) {}
         runHook(hooks.onAfterResolve, args, parsed, result);
@@ -147,7 +152,8 @@ export const createPublication = <
   };
 
   subscribe.usePublication = (args: z.input<Schema>) => {
-    if (Meteor.isServer) throw new Error("usePublication can only be used on the client");
+    if (Meteor.isServer)
+      throw new Error("usePublication can only be used on the client");
     const { data: collName } = useSuspenseQuery({
       queryKey: [name, args],
       // @ts-ignore
@@ -157,8 +163,7 @@ export const createPublication = <
     // @ts-ignore
     const coll = Meteor.connection._stores[collName]._getCollection();
     return useFind(() => coll.find(args), [args]) as unknown as Result;
-  }
+  };
 
   return subscribe as unknown as ReturnSubscription<Name, Schema, Result>;
 };
-

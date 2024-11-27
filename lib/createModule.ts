@@ -1,8 +1,9 @@
-import { Schema, z } from "zod";
-import { Config, Resolver, ReturnMethod, ReturnSubscription } from "../types";
-import { createMethod, createPublication } from "../server-main";
+import { z } from "zod";
+import { Config, ReturnMethod, ReturnSubscription } from "../types";
+import { createMethod, createRealtimeQuery } from "../server-main";
+// @ts-ignore
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
-import { createRealtimeQuery } from "./createRealtimeQuery";
+// @ts-ignore
 import { Mongo } from "meteor/mongo";
 
 export const createModule = <
@@ -66,7 +67,10 @@ export const createModule = <
   >(
     name: Name,
     schema: Schema,
-    resolver: (this: MeteorSubscription, args: UnwrappedArgs) => Mongo.Cursor<T> | Promise<Mongo.Cursor<T>>,
+    resolver: (
+      this: MeteorSubscription,
+      args: UnwrappedArgs
+    ) => Mongo.Cursor<T> | Promise<Mongo.Cursor<T>>,
     config?: Config<UnwrappedArgs, T>
   ) => {
     const nameWithPrefix = prefix ? `${prefix}.${name}` : name;

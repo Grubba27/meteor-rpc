@@ -1,3 +1,4 @@
+// @ts-ignore
 import { Tinytest } from "meteor/tinytest";
 import { Meteor } from "meteor/meteor";
 import { createMethod, createPublication } from "../server-main";

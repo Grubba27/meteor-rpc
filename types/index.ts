@@ -4,7 +4,9 @@ import {
   UseSuspenseQueryOptions,
   UseSuspenseQueryResult,
 } from "@tanstack/react-query";
+// @ts-ignore
 import { Meteor } from "meteor/meteor";
+// @ts-ignore
 import { Mongo } from "meteor/mongo";
 import { z } from "zod";
 

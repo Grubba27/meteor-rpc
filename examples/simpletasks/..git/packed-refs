@@ -1,5 +1,0 @@
-# pack-refs with: peeled fully-peeled sorted 
-1a590b90211a77a9f99e36b6666277f50505211a refs/remotes/origin/feature/astronomy
-d2215ce954c1713db5592cb8a5bdf2fe4409f764 refs/remotes/origin/main
-16acb6efb8e3afb3b178b155a96bfd3ef971d735 refs/remotes/origin/mongodb-async-api
-1e174ec78bf7785646f35804cd1bd80d9d6315b1 refs/remotes/origin/staging

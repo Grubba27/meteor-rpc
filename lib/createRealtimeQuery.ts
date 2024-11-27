@@ -1,8 +1,10 @@
 import { z } from "zod";
+// @ts-ignore
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
 import { Config } from "../types";
 import { useFind } from "./utils/hooks/useFind";
 import { useSubscribe } from "./utils/hooks/useSubscribe";
+// @ts-ignore
 import { Mongo } from "meteor/mongo";
 
 export const createRealtimeQuery = <
@@ -28,25 +30,27 @@ export const createRealtimeQuery = <
 
       const clientCollection = name;
 
-      const cursor = await resolver.call(this, parsed);
+      const cursor: Mongo.Cursor<Result> =
+      // @ts-ignore
+          await resolver.call(this, parsed);
 
       const observerHandle = await cursor.observeChanges({
-        added: (_id, fields) => {
-          // console.log('Added:', _id, fields);
+        added: (_id: string, fields: Partial<Result>) => {
+          // @ts-ignore
           this.added(clientCollection, _id, fields);
         },
-        changed: (_id, fields) => {
-          // console.log('Changed:', _id, fields);
+        changed: (_id: string, fields: Partial<Result>) => {
+          // @ts-ignore
           this.changed(clientCollection, _id, fields);
         },
-        removed: (_id) => {
-          // console.log('Removed:', _id);
+        removed: (_id: string) => {
+          // @ts-ignore
           this.removed(clientCollection, _id);
         },
       });
-
+      // @ts-ignore
       this.ready();
-
+      // @ts-ignore
       this.onStop(() => {
         observerHandle.stop();
       });

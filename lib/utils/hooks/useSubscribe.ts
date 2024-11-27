@@ -1,7 +1,11 @@
 import { useEffect } from "react";
+// @ts-ignore
 import { EJSON } from "meteor/ejson";
+// @ts-ignore
 import { Meteor } from "meteor/meteor";
+// @ts-ignore
 import isEqual from "lodash.isequal";
+// @ts-ignore
 import remove from "lodash.remove";
 
 const cachedSubscriptions: Entry[] = [];

@@ -6,6 +6,7 @@ import {
   createMethod,
   createClient,
   createSafeCaller,
+  createRealtimeQuery,
 } from "./lib";
 
 import {
@@ -27,4 +28,5 @@ export {
   createPublication,
   createClient,
   createSafeCaller,
+  createRealtimeQuery,
 };

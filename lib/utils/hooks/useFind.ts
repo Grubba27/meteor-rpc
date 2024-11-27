@@ -1,6 +1,9 @@
+//@ts-ignore
 import { Meteor } from 'meteor/meteor'
+//@ts-ignore
 import { Mongo } from 'meteor/mongo'
 import { useReducer, useMemo, useEffect, Reducer, DependencyList, useRef } from 'react'
+//@ts-ignore
 import { Tracker } from 'meteor/tracker'
 
 type useFindActions<T> =
@@ -63,6 +66,7 @@ const checkCursor = <T>(cursor: Mongo.Cursor<T> | Partial<{ _mongo: any, _cursor
 const fetchData = <T>(cursor: Mongo.Cursor<T>) => {
   const data: T[] = []
   const observer = cursor.observe({
+    //@ts-ignore
     addedAt (document, atIndex, before) {
       data.splice(atIndex, 0, document)
     },
@@ -106,6 +110,7 @@ const useFindClient = <T = any>(factory: () => (Mongo.Cursor<T> | undefined | nu
       }
 
       const data = fetchData(cursor)
+      // @ts-ignore
       dispatch({ type: 'refresh', data })
     } else {
       didMount.current = true
@@ -116,15 +121,19 @@ const useFindClient = <T = any>(factory: () => (Mongo.Cursor<T> | undefined | nu
     }
 
     const observer = cursor.observe({
+      // @ts-ignore
       addedAt (document, atIndex, before) {
         dispatch({ type: 'addedAt', document, atIndex })
       },
+      // @ts-ignore
       changedAt (newDocument, oldDocument, atIndex) {
         dispatch({ type: 'changedAt', document: newDocument, atIndex })
       },
+      // @ts-ignore
       removedAt (oldDocument, atIndex) {
         dispatch({ type: 'removedAt', atIndex })
       },
+      // @ts-ignore
       movedTo (document, fromIndex, toIndex, before) {
         dispatch({ type: 'movedTo', fromIndex, toIndex })
       },

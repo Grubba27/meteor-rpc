@@ -1,10 +1,12 @@
 import { createMethod } from "./createMethod";
+// @ts-ignore
 import { Meteor } from "meteor/meteor";
 import { z } from "zod";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation as useMutationRQ } from "@tanstack/react-query";
 import { useSubscribe } from "./utils/hooks/useSubscribe";
 import useFind from "./utils/hooks/useFind";
+// @ts-ignore
 import { Mongo } from "meteor/mongo";
 type M = ReturnType<typeof createMethod>;
 type R = Record<string, M>;

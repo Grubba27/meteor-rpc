@@ -1,20 +1,27 @@
-
-export const RateLimiterConfig =
-  (type: 'method'| 'subscription', name: string, config: {
-      interval: number,
-      limit: number
-  }) => {
-    DDPRateLimiter.addRule({
+export const RateLimiterConfig = (
+  type: "method" | "subscription",
+  name: string,
+  config: {
+    interval: number;
+    limit: number;
+  }
+) => {
+  // @ts-ignore
+  DDPRateLimiter.addRule(
+    {
       type: type,
       name: name,
       clientAddress() {
-        return true
+        return true;
       },
       connectionId() {
-        return true
+        return true;
       },
       userId() {
-        return true
+        return true;
       },
-    }, config.limit, config.interval);
-  }
+    },
+    config.limit,
+    config.interval
+  );
+};

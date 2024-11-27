@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Config, ReturnMethod } from "../types";
 import { isThenable } from "./utils/isThenable";
 import { RateLimiterConfig } from "./utils/RateLimiterConfig";
+// @ts-ignore
 import { Meteor } from "meteor/meteor";
 import { runHook } from "./utils/runHook";
 import {
