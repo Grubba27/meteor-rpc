@@ -1,49 +1,58 @@
 //@ts-ignore
-import { Meteor } from 'meteor/meteor'
+import { Meteor } from "meteor/meteor";
 //@ts-ignore
-import { Mongo } from 'meteor/mongo'
-import { useReducer, useMemo, useEffect, Reducer, DependencyList, useRef } from 'react'
+import { Mongo } from "meteor/mongo";
+import {
+  useReducer,
+  useMemo,
+  useEffect,
+  Reducer,
+  DependencyList,
+  useRef,
+  // @ts-ignore
+} from "react";
+
 //@ts-ignore
-import { Tracker } from 'meteor/tracker'
+import { Tracker } from "meteor/tracker";
 
 type useFindActions<T> =
-  | { type: 'refresh', data: T[] }
-  | { type: 'addedAt', document: T, atIndex: number }
-  | { type: 'changedAt', document: T, atIndex: number }
-  | { type: 'removedAt', atIndex: number }
-  | { type: 'movedTo', fromIndex: number, toIndex: number }
+  | { type: "refresh"; data: T[] }
+  | { type: "addedAt"; document: T; atIndex: number }
+  | { type: "changedAt"; document: T; atIndex: number }
+  | { type: "removedAt"; atIndex: number }
+  | { type: "movedTo"; fromIndex: number; toIndex: number };
 
 const useFindReducer = <T>(data: T[], action: useFindActions<T>): T[] => {
   switch (action.type) {
-    case 'refresh':
-      return action.data
-    case 'addedAt':
+    case "refresh":
+      return action.data;
+    case "addedAt":
       return [
         ...data.slice(0, action.atIndex),
         action.document,
-        ...data.slice(action.atIndex)
-      ]
-    case 'changedAt':
+        ...data.slice(action.atIndex),
+      ];
+    case "changedAt":
       return [
         ...data.slice(0, action.atIndex),
         action.document,
-        ...data.slice(action.atIndex + 1)
-      ]
-    case 'removedAt':
+        ...data.slice(action.atIndex + 1),
+      ];
+    case "removedAt":
       return [
         ...data.slice(0, action.atIndex),
-        ...data.slice(action.atIndex + 1)
-      ]
-    case 'movedTo':
-      const doc = data[action.fromIndex]
+        ...data.slice(action.atIndex + 1),
+      ];
+    case "movedTo":
+      const doc = data[action.fromIndex];
       const copy = [
         ...data.slice(0, action.fromIndex),
-        ...data.slice(action.fromIndex + 1)
-      ]
-      copy.splice(action.toIndex, 0, doc)
-      return copy
+        ...data.slice(action.fromIndex + 1),
+      ];
+      copy.splice(action.toIndex, 0, doc);
+      return copy;
   }
-}
+};
 
 // Check for valid Cursor or null.
 // On client, we should have a Mongo.Cursor (defined in
@@ -52,125 +61,141 @@ const useFindReducer = <T>(data: T[], action: useFindActions<T>): T[] => {
 // On server, however, we instead get a private Cursor type from
 // https://github.com/meteor/meteor/blob/devel/packages/mongo/mongo_driver.js
 // which has fields _mongo and _cursorDescription.
-const checkCursor = <T>(cursor: Mongo.Cursor<T> | Partial<{ _mongo: any, _cursorDescription: any }> | undefined | null) => {
-  if (cursor !== null && cursor !== undefined && !(cursor instanceof Mongo.Cursor) &&
-      !(cursor._mongo && cursor._cursorDescription)) {
+const checkCursor = <T>(
+  cursor:
+    | Mongo.Cursor<T>
+    | Partial<{ _mongo: any; _cursorDescription: any }>
+    | undefined
+    | null
+) => {
+  if (
+    cursor !== null &&
+    cursor !== undefined &&
+    !(cursor instanceof Mongo.Cursor) &&
+    !(cursor._mongo && cursor._cursorDescription)
+  ) {
     console.warn(
-      'Warning: useFind requires an instance of Mongo.Cursor. '
-      + 'Make sure you do NOT call .fetch() on your cursor.'
+      "Warning: useFind requires an instance of Mongo.Cursor. " +
+        "Make sure you do NOT call .fetch() on your cursor."
     );
   }
-}
+};
 
 // Synchronous data fetch. It uses cursor observing instead of cursor.fetch() because synchronous fetch will be deprecated.
 const fetchData = <T>(cursor: Mongo.Cursor<T>) => {
-  const data: T[] = []
+  const data: T[] = [];
   const observer = cursor.observe({
     //@ts-ignore
-    addedAt (document, atIndex, before) {
-      data.splice(atIndex, 0, document)
+    addedAt(document, atIndex, before) {
+      data.splice(atIndex, 0, document);
     },
-  })
-  observer.stop()
-  return data
-}
+  });
+  observer.stop();
+  return data;
+};
 
-const useFindClient = <T = any>(factory: () => (Mongo.Cursor<T> | undefined | null), deps: DependencyList = []) => {
+const useFindClient = <T = any>(
+  factory: () => Mongo.Cursor<T> | undefined | null,
+  deps: DependencyList = []
+) => {
   const cursor = useMemo(() => {
     // To avoid creating side effects in render, opt out
     // of Tracker integration altogether.
     const cursor = Tracker.nonreactive(factory);
     if (Meteor.isDevelopment) {
-      checkCursor(cursor)
+      checkCursor(cursor);
     }
-    return cursor
-  }, deps)
+    return cursor;
+  }, deps);
 
   const [data, dispatch] = useReducer<Reducer<T[], useFindActions<T>>, null>(
     useFindReducer,
     null,
     () => {
       if (!(cursor instanceof Mongo.Cursor)) {
-        return []
+        return [];
       }
 
-      return fetchData(cursor)
+      return fetchData(cursor);
     }
-  )
+  );
 
   // Store information about mounting the component.
   // It will be used to run code only if the component is updated.
-  const didMount = useRef(false)
+  const didMount = useRef(false);
 
   useEffect(() => {
     // Fetch intitial data if cursor was changed.
     if (didMount.current) {
       if (!(cursor instanceof Mongo.Cursor)) {
-        return
+        return;
       }
 
-      const data = fetchData(cursor)
+      const data = fetchData(cursor);
       // @ts-ignore
-      dispatch({ type: 'refresh', data })
+      dispatch({ type: "refresh", data });
     } else {
-      didMount.current = true
+      didMount.current = true;
     }
 
     if (!(cursor instanceof Mongo.Cursor)) {
-      return
+      return;
     }
 
     const observer = cursor.observe({
       // @ts-ignore
-      addedAt (document, atIndex, before) {
-        dispatch({ type: 'addedAt', document, atIndex })
+      addedAt(document, atIndex, before) {
+        dispatch({ type: "addedAt", document, atIndex });
       },
       // @ts-ignore
-      changedAt (newDocument, oldDocument, atIndex) {
-        dispatch({ type: 'changedAt', document: newDocument, atIndex })
+      changedAt(newDocument, oldDocument, atIndex) {
+        dispatch({ type: "changedAt", document: newDocument, atIndex });
       },
       // @ts-ignore
-      removedAt (oldDocument, atIndex) {
-        dispatch({ type: 'removedAt', atIndex })
+      removedAt(oldDocument, atIndex) {
+        dispatch({ type: "removedAt", atIndex });
       },
       // @ts-ignore
-      movedTo (document, fromIndex, toIndex, before) {
-        dispatch({ type: 'movedTo', fromIndex, toIndex })
+      movedTo(document, fromIndex, toIndex, before) {
+        dispatch({ type: "movedTo", fromIndex, toIndex });
       },
       // @ts-ignore
-      _suppress_initial: true
-    })
+      _suppress_initial: true,
+    });
 
     return () => {
-      observer.stop()
-    }
-  }, [cursor])
+      observer.stop();
+    };
+  }, [cursor]);
 
-  return cursor ? data : cursor
-}
+  return cursor ? data : cursor;
+};
 
 // @ts-ignore
-const useFindServer = <T = any>(factory: () => Mongo.Cursor<T> | undefined | null, deps: DependencyList) => (
+const useFindServer = <T = any>(
+  factory: () => Mongo.Cursor<T> | undefined | null,
+  deps: DependencyList
+) =>
   Tracker.nonreactive(() => {
-    const cursor = factory()
-    if (Meteor.isDevelopment) checkCursor(cursor)
-    return cursor?.fetch?.() ?? null
-  })
-)
+    const cursor = factory();
+    if (Meteor.isDevelopment) checkCursor(cursor);
+    return cursor?.fetch?.() ?? null;
+  });
 
-export const useFind = Meteor.isServer
-  ? useFindServer
-  : useFindClient
+export const useFind = Meteor.isServer ? useFindServer : useFindClient;
 
-function useFindDev <T = any>(factory: () => (Mongo.Cursor<T> | undefined | null), deps: DependencyList = []) {
-  function warn (expects: string, pos: string, arg: string, type: string) {
+function useFindDev<T = any>(
+  factory: () => Mongo.Cursor<T> | undefined | null,
+  deps: DependencyList = []
+) {
+  function warn(expects: string, pos: string, arg: string, type: string) {
     console.warn(
-      `Warning: useFind expected a ${expects} in it\'s ${pos} argument `
-        + `(${arg}), but got type of \`${type}\`.`
+      `Warning: useFind expected a ${expects} in it\'s ${pos} argument ` +
+        `(${arg}), but got type of \`${type}\`.`
     );
   }
 
-  if (typeof factory !== 'function') {
+  if (typeof factory !== "function") {
     warn("function", "1st", "reactiveFn", factory);
   }
 
@@ -181,6 +206,4 @@ function useFindDev <T = any>(factory: () => (Mongo.Cursor<T> | undefined | null
   return useFind(factory, deps);
 }
 
-export default Meteor.isDevelopment
-  ? useFindDev
-  : useFind;
+export default Meteor.isDevelopment ? useFindDev : useFind;

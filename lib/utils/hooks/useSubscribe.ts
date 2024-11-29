@@ -1,3 +1,4 @@
+// @ts-ignore
 import { useEffect } from "react";
 // @ts-ignore
 import { EJSON } from "meteor/ejson";

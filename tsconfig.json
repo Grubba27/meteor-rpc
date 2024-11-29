@@ -7,7 +7,9 @@
     "noEmit": true,
     "strict": true,
     "target": "ESNext",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true
   },
   "files": ["./server-main.ts"]
 }
