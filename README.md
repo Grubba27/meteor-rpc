@@ -1,9 +1,8 @@
-# RPC
+# Meteor-RPC
 
 ## What is this package?
 
-_Inspired on [zodern:relay](https://github.com/zodern/meteor-relay)_
-_Inspired on [tRPC](https://trpc.io/)_
+_Inspired on [zodern:relay](https://github.com/zodern/meteor-relay) and on [tRPC](https://trpc.io/)_
 
 This package provides functions for building E2E type-safe RPCs.
 
@@ -17,48 +16,182 @@ install react query into your project, following their [quick start guide](https
 
 ## How to use it?
 
+Firstly, you need to create a module, then you can add methods, publications, and subscriptions to it.
+
+Then you need to build the module and use it in the client as a type.
+
 ### createModule
 
+`subModule` without a namespace: `createModule()` is used to create the `main` server module, the one that will be exported to be used in the client.
+
+`subModule` with a namespace: `createModule("namespace")` is used to create a submodule that will be added to the main module.
+
+> Remember to use `build` at the end of module creation to ensure that the module is going to be created.
+
+for example:
+
 ```typescript
-const Tasks = createModule("tasks", { insert, remove, setChecked }).build();
-const foo = createModule("foo")
-  .addMethod("bar", z.string(), () => "bar" as const)
-  .addMethod("baz", z.string(), () => "baz")
-  .addQuery("get", z.string(), () => "get")
-  .addSubmodule("task", Tasks)
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { ChatCollection } from "/imports/api/chat";
+import { z } from "zod";
+
+const Chat = createModule("chat")
+  .addMethod("createChat", z.void(), async () => {
+    return ChatCollection.insertAsync({ createdAt: new Date(), messages: [] });
+  })
+  .buildSubmodule();
+
+const server = createModule() // server has no namespace
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
+  .addSubmodule(Chat)
   .build();
 
-const k = await foo.bar();
+export type Server = typeof server;
+
+// client.ts
+import { createClient } from "grubba-rpc";
+
+const api = createClient<Server>();
+const bar: "bar" = await api.bar("some string");
 //   ?^ 'bar'
+const newChatId = await api.chat.createChat(); // with intellisense
+```
+
+### module.addMethod
+
+`addMethod(name: string, schema: ZodSchema, handler: (args: ZodTypeInput<ZodSchema>) => T, config?: Config<ZodTypeInput<ZodSchema>, T>)`
+
+This is the equivalent of `Meteor.methods` but with types and runtime validation.
+
+```typescript
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { z } from "zod";
+
+const server = createModule();
+
+server.addMethod("foo", z.string(), (arg) => "foo" as const);
+
+server.build();
+
+// is the same as
+
+import { Meteor } from "meteor/meteor";
+import { z } from "zod";
+
+Meteor.methods({
+  foo(arg: string) {
+    z.string().parse(arg);
+    return "foo";
+  },
+});
+```
+
+### module.addPublication
+
+`addPublication(name: string, schema: ZodSchema, handler: (args: ZodTypeInput<ZodSchema>) => Cursor<any, any>)`
+
+This is the equivalent of `Meteor.publish` but with types and runtime validation.
+
+```typescript
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { ChatCollection } from "/imports/api/chat";
+import { z } from "zod";
+
+const server = createModule();
+
+server.addPublication("chatRooms", z.void(), () => {
+  return ChatCollection.find();
+});
+
+server.build();
+
+// is the same as
+import { Meteor } from "meteor/meteor";
+import { ChatCollection } from "/imports/api/chat";
+
+Meteor.publish("chatRooms", function () {
+  return ChatCollection.find();
+});
+```
+
+### module.addSubmodule
+
+This is used to add a submodule to the main module, adding namespaces for your methods and publications and also making it easier to organize your code.
+
+> Remember to use `submodule.buildSubmodule` when creating a submodule
+
+```typescript
+// module/chat.ts
+import { ChatCollection } from "/imports/api/chat";
+import { createModule } from "grubba-rpc";
+
+export const chatModule = createModule("chat")
+  .addMethod("createChat", z.void(), async () => {
+    return ChatCollection.insertAsync({ createdAt: new Date(), messages: [] });
+  })
+  .buildSubmodule(); // <-- this is important so that this module can be added as a submodule
+
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { chatModule } from "./module/chat";
+
+const server = createModule()
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
+  .addSubmodule(chatModule)
+  .build();
+
+server.chat; // <-- this is the namespace for the chat module
+```
+
+### module.addMiddlewares
+
+`addMiddlewares(middlewares: Middleware[])`
+
+`Type Middleware = (raw: unknown, parsed: unknown) => void;`
+
+This is used to add middlewares to the module, it can be used to add side effects logic to the methods and publications, ideal for logging, rate limiting, etc.
+
+The middleware ordering is last in first out. Check the example below:
+
+```typescript
+// module/chat.ts
+import { ChatCollection } from "/imports/api/chat";
+import { createModule } from "grubba-rpc";
+
+export const chatModule = createModule("chat")
+  .addMiddlewares([
+    (raw, parsed) => {
+      console.log("run first");
+    },
+  ])
+  .addMethod("createChat", z.void(), async () => {
+    return ChatCollection.insertAsync({ createdAt: new Date(), messages: [] });
+  })
+  .buildSubmodule();
+
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { chatModule } from "./module/chat";
+
+const server = createModule()
+  .addMiddlewares([
+    (raw, parsed) => {
+      console.log("run second");
+    },
+  ])
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
+  .addSubmodule(chatModule)
+  .build();
 ```
 
 ## React focused API
 
-For now, only works for methods
-
-```typescript
-const test1 = createMethod("name", z.any(), () => "str");
-// in react context / component.tsx
-
-const { data } = test1.useQuery();
-// works like useSuspenseQuery from https://tanstack.com/query/latest/docs/react/reference/useSuspenseQuery
-
-// or you can use for mutation
-const { mutate } = test1.useMutation();
-// uses the https://tanstack.com/query/v4/docs/react/reference/useMutation under the hood
-```
-
-## method.useQuery
-
-This uses the same api as [useSuspenseQuery](https://tanstack.com/query/latest/docs/react/reference/useSuspenseQuery)
-
-## method.useMutation
-
-This uses the same api as [useMutation](https://tanstack.com/query/v4/docs/react/reference/useMutation)
-
 ### Using in the client
 
-When using in the client you _should_ use the `createModule` and `build` methods to create a module that will be used in the client
+When using in the client you _have_ to use the `createModule` and `build` methods to create a module that will be used in the client
 and be sure that you are exporting the type of the module
 
 _You should only create one client in your application_
@@ -66,35 +199,123 @@ _You should only create one client in your application_
 You can have something like `api.ts` that will export the client and the type of the client
 
 ```typescript
-// server.ts
+// server/main.ts
+import { createModule } from "grubba-rpc";
 
-const otherModule = createModule()
-  .addMethod("bar", z.string(), () => "bar")
-  .build();
 const server = createModule()
-  .addMethod("foo", z.string(), () => "foo")
-  .addMethod("bar", z.string(), () => "bar")
-  .addSubmodule("other", otherModule)
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
   .build();
 
 export type Server = typeof server;
 
 // client.ts
-
+import type { Server } from "/imports/api/server"; // you must import the type
 const app = createClient<Server>();
 
-app.foo("str"); // <--- This is type safe
-app.other.bar("str"); // <--- This is type safe
+await app.bar("str"); // it will return "bar"
 ```
+
+### method.useMutation
+
+It uses the [`useMutation`](https://tanstack.com/query/latest/docs/framework/react/reference/useMutation#usemutation) from react-query to create a mutation that will call the method
+
+```tsx
+// server/main.ts
+import { createModule } from "grubba-rpc";
+
+const server = createModule()
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
+  .build();
+
+export type Server = typeof server;
+
+// client.ts
+import type { Server } from "/imports/api/server"; // you must import the type
+const app = createClient<Server>();
+
+export const Component = () => {
+  const { mutate, isLoading, isError, error, data } = app.bar.useMutation();
+
+  return (
+    <button
+      onClick={() => {
+        mutation.mutate("str"); // it has intellisense
+      }}
+    >
+      Click me
+    </button>
+  );
+};
+```
+
+### method.useQuery
+
+It uses the [`useQuery`](https://tanstack.com/query/latest/docs/framework/react/reference/useSuspenseQuery#usesuspensequery) from react-query to create a query that will call the method, it uses `suspense` to handle loading states
+
+```tsx
+// server/main.ts
+import { createModule } from "grubba-rpc";
+
+const server = createModule()
+  .addMethod("bar", z.string(), (arg) => "bar" as const)
+  .build();
+
+export type Server = typeof server;
+
+// client.ts
+import type { Server } from "/imports/api/server"; // you must import the type
+const app = createClient<Server>();
+
+export const Component = () => {
+  const { data } = app.bar.useQuery("str"); // will trigger suspense
+
+  return <div>{data}</div>;
+};
+```
+
+### publication.useSubscription
+
+Subscriptions on the client have `useSubscription` method that can be used as a hook to subscribe to a publication. It uses `suspense` to handle loading states
+
+```tsx
+// server/main.ts
+import { createModule } from "grubba-rpc";
+import { ChatCollection } from "/imports/api/chat";
+import { z } from "zod";
+
+const server = createModule()
+  .addPublication("chatRooms", z.void(), () => {
+    return ChatCollection.find();
+  })
+  .build();
+
+export type Server = typeof server;
+
+// client.ts
+import type { Server } from "/imports/api/server"; // you must import the type
+const app = createClient<Server>();
+
+export const Component = () => {
+  const { data: rooms, collection: chatCollection } =
+    api.chatRooms.usePublication(); // it will trigger suspense and rooms is reactive
+
+  return <div>{data}</div>;
+};
+```
+
+## Examples
+
+Currently we have this [chat-app](https://github.com/Grubba27/testing-meteor-rpc) that uses this package to create a chat app
+
+it includes: methods, publications, and subscriptions
 
 ## Advanced usage
 
-### Advanced usage
-
-you can take advantage of the hooks to add custom logic to your methods and publications
+you can take advantage of the hooks to add custom logic to your methods, checking the raw and parsed data, and the result of the method,
+you can add more complex validations.
 
 ```typescript
-addMethod("name", z.any(), () => "str", {
+server.addMethod("name", z.any(), () => "str", {
   hooks: {
     onBeforeResolve: [
       (raw, parsed) => {
@@ -132,195 +353,4 @@ server.name.addErrorResolveHook((err, raw, parsed) => {
 });
 
 server = server.build();
-```
-
-## Legacy API:
-
-### createMethod
-
-```typescript
-const test1 = createMethod("name", z.any(), () => "str");
-const result = await test1();
-//    ˆ? is string and their value is 'str'
-```
-
-For semantics uses you can as well use the methods below with the same output as createMethod:
-
-```typescript
-const joinStr = createMutation(
-  "join",
-  z.object({ foo: z.string(), bar: z.string() }),
-  ({ foo, bar }) => foo + bar
-);
-const result = await joinStr({ foo: "foo", bar: "bar" });
-//    ˆ? is string and their value is 'foobar'
-```
-
-```typescript
-const query = createQuery(
-  "query",
-  z.object({ _id: z.string() }),
-  async ({ _id }) => {
-    const someData = await DB.findOne(_id);
-    const otherData = await DB.find({
-      _id: { $ne: someData._id },
-    }).fetchAsync();
-    return { someData, otherData };
-  }
-);
-const result = await query({ _id: "id" });
-//    ˆ? is string and their value is the item you was querying
-```
-
-_example of use_
-
-createMethod accepts 4 arguments:
-
-- name: string
-- schema: ZodSchema (validator)
-- handler (optional): function that receives the arguments of the method and returns the result
-- config (optional): object with the following properties:
-
-```typescript
-type Config<S, T> = {
-  rateLimit?: {
-    interval: number;
-    limit: number;
-  };
-  hooks?: {
-    onBeforeResolve?: Array<(raw: unknown, parsed: S) => void>;
-    onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
-    onErrorResolve?: Array<
-      (err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void
-    >;
-  };
-};
-```
-
-### createPublication
-
-```typescript
-const publication = createPublication(
-  "findRooms",
-  z.object({ level: z.number() }),
-  ({ level }) => Rooms.find({ level: level })
-);
-const result = publication({ level: 1 }, (rooms) => console.log(rooms));
-//                                            ˆ? subscription
-```
-
-_example of use_
-
-createPublication accepts 4 arguments:
-
-- name: string
-- schema: ZodSchema (validator)
-- handler (optional): function that is being published
-- config (optional): object with the following properties:
-
-_note that subscription returns the subscription handler the same way as Meteor.publish_
-
-```typescript
-type Config<S, T> = {
-  rateLimit?: {
-    interval: number;
-    limit: number;
-  };
-  hooks?: {
-    onBeforeResolve?: Array<(raw: unknown, parsed: S) => void>;
-    onAfterResolve?: Array<(raw: Maybe<T>, parsed: S, result: T) => void>;
-    onErrorResolve?: Array<
-      (err: Meteor.Error | Error | unknown, raw: Maybe<T>, parsed: S) => void
-    >;
-  };
-};
-```
-
-### Advanced usage
-
-you can take advantage of the hooks to add custom logic to your methods and publications
-
-```typescript
-const fn = createMethod("name", z.any(), () => "str", {
-  hooks: {
-    onBeforeResolve: [
-      (raw, parsed) => {
-        console.log("before resolve", raw, parsed);
-      },
-    ],
-    onAfterResolve: [
-      (raw, parsed, result) => {
-        console.log("after resolve", raw, parsed, result);
-      },
-    ],
-    onErrorResolve: [
-      (err, raw, parsed) => {
-        console.log("error resolve", err, raw, parsed);
-      },
-    ],
-  },
-});
-// valid ways as well
-fn.addErrorResolveHook((err, raw, parsed) => {
-  console.log("error resolve", err, raw, parsed);
-});
-fn.addBeforeResolveHook((raw, parsed) => {
-  console.log("before resolve", raw, parsed);
-});
-fn.addAfterResolveHook((raw, parsed, result) => {
-  console.log("after resolve", raw, parsed, result);
-});
-const result = await fn();
-```
-
-### Using safe methods
-
-check this example that illustrates this 'secure way' of using safe methods, as it is not bundled in the client
-
-```typescript
-import { createMethod } from "grubba-rpc";
-import { z } from "zod";
-
-const DescriptionValidator = z.object({ description: z.string() });
-
-// tasks.mutations.ts
-// it expects the return type to be a void
-export const insert = createMethod(
-  "task.insert",
-  DescriptionValidator
-).expect<void>();
-
-// tasks.mutations.js
-// If you are using javascript, you can use the following syntax
-export const insert = createMethod("task.insert", DescriptionValidator).expect(
-  z.void()
-);
-// or you can use other name such as:
-export const insert = createMethod("task.insert", DescriptionValidator).returns(
-  z.void()
-);
-
-// ---------
-
-// tasks.methods.ts
-import { insert } from "./tasks.mutations.ts";
-
-insertTask = ({ description }) => {
-  TasksCollection.insert({
-    description,
-    userId: Meteor.userId(),
-    createdAt: new Date(),
-  });
-};
-
-insert.setResolver(insertTask);
-
-// ---------
-
-// client.ts
-import { insert } from "./tasks.mutations.ts";
-
-insert({ description: "test" });
-//^? it return void and it will run
-// if resolver is not set it will throw an error
 ```
