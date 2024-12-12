@@ -9,7 +9,7 @@ This package provides functions for building E2E type-safe RPCs.
 ## How to download it?
 
 ```bash
-meteor npm i grubba-rpc @tanstack/react-query zod
+meteor npm i meteor-rpc @tanstack/react-query zod
 ```
 
 install react query into your project, following their [quick start guide](https://tanstack.com/query/latest/docs/framework/react/quick-start)
@@ -32,7 +32,7 @@ for example:
 
 ```typescript
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { ChatCollection } from "/imports/api/chat";
 import { z } from "zod";
 
@@ -50,7 +50,7 @@ const server = createModule() // server has no namespace
 export type Server = typeof server;
 
 // client.ts
-import { createClient } from "grubba-rpc";
+import { createClient } from "meteor-rpc";
 
 const api = createClient<Server>();
 const bar: "bar" = await api.bar("some string");
@@ -66,7 +66,7 @@ This is the equivalent of `Meteor.methods` but with types and runtime validation
 
 ```typescript
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { z } from "zod";
 
 const server = createModule();
@@ -96,7 +96,7 @@ This is the equivalent of `Meteor.publish` but with types and runtime validation
 
 ```typescript
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { ChatCollection } from "/imports/api/chat";
 import { z } from "zod";
 
@@ -126,7 +126,7 @@ This is used to add a submodule to the main module, adding namespaces for your m
 ```typescript
 // module/chat.ts
 import { ChatCollection } from "/imports/api/chat";
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 
 export const chatModule = createModule("chat")
   .addMethod("createChat", z.void(), async () => {
@@ -135,7 +135,7 @@ export const chatModule = createModule("chat")
   .buildSubmodule(); // <-- this is important so that this module can be added as a submodule
 
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { chatModule } from "./module/chat";
 
 const server = createModule()
@@ -159,7 +159,7 @@ The middleware ordering is last in first out. Check the example below:
 ```typescript
 // module/chat.ts
 import { ChatCollection } from "/imports/api/chat";
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 
 export const chatModule = createModule("chat")
   .addMiddlewares([
@@ -173,7 +173,7 @@ export const chatModule = createModule("chat")
   .buildSubmodule();
 
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { chatModule } from "./module/chat";
 
 const server = createModule()
@@ -200,7 +200,7 @@ You can have something like `api.ts` that will export the client and the type of
 
 ```typescript
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 
 const server = createModule()
   .addMethod("bar", z.string(), (arg) => "bar" as const)
@@ -221,7 +221,7 @@ It uses the [`useMutation`](https://tanstack.com/query/latest/docs/framework/rea
 
 ```tsx
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 
 const server = createModule()
   .addMethod("bar", z.string(), (arg) => "bar" as const)
@@ -254,7 +254,7 @@ It uses the [`useQuery`](https://tanstack.com/query/latest/docs/framework/react/
 
 ```tsx
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 
 const server = createModule()
   .addMethod("bar", z.string(), (arg) => "bar" as const)
@@ -279,7 +279,7 @@ Subscriptions on the client have `useSubscription` method that can be used as a 
 
 ```tsx
 // server/main.ts
-import { createModule } from "grubba-rpc";
+import { createModule } from "meteor-rpc";
 import { ChatCollection } from "/imports/api/chat";
 import { z } from "zod";
 
