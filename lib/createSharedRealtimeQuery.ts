@@ -7,7 +7,7 @@ import { useSubscribe } from "./utils/hooks/useSubscribe";
 // @ts-ignore
 import { Mongo } from "meteor/mongo";
 
-export const createRealtimeQuery = <
+export const createSharedRealtimeQuery = <
   Name extends string,
   Schema extends z.ZodUndefined | z.ZodTypeAny,
   Result,
@@ -20,7 +20,7 @@ export const createRealtimeQuery = <
   resolver: (
     this: MeteorSubscription,
     args: z.input<Schema>
-  ) => Mongo.Cursor<Result> | Promise<Mongo.Cursor<Result>>,
+  ) => Array<Mongo.Cursor<Result>> | Promise<Array<Mongo.Cursor<Result>>>,
   config?: Config<UnwrappedArgs, Result>
 ) => {
   if (Meteor.isServer) {
@@ -29,12 +29,13 @@ export const createRealtimeQuery = <
 
       const clientCollection = name;
 
-      const cursor: Mongo.Cursor<Result> =
+      const cursors: Array<Mongo.Cursor<Result>> =
       // @ts-ignore
           await resolver.call(this, parsed);
 
-      const observerHandle = await cursor.observeChanges({
-        added: (_id: string, fields: Partial<Result>) => {
+      const observerHandles = cursors.map( (c) =>
+         c.observeChanges({
+          added: (_id: string, fields: Partial<Result>) => {
           // @ts-ignore
           this.added(clientCollection, _id, fields);
         },
@@ -46,20 +47,23 @@ export const createRealtimeQuery = <
           // @ts-ignore
           this.removed(clientCollection, _id);
         },
-      });
+      }));
       // @ts-ignore
       this.ready();
       // @ts-ignore
       this.onStop(() => {
-        observerHandle.stop();
+      // @ts-ignore
+        observerHandles.forEach((promiseHandle) => promiseHandle.then(h => h.stop()));
       });
     });
   }
   function query(args: z.input<Schema>) {
     // @ts-ignore
-    return new Mongo.Collection<Result>(name).find(
-      args
-    ) as unknown as Mongo.Cursor<Result>;
+    return [
+      new Mongo.Collection<Result>(name).find(
+        args
+      ) as unknown as Mongo.Cursor<Result>
+    ]
   }
   query.config = { ...config, name, schema, resolver };
   query.useRealtime = (args: z.input<Schema>) => {

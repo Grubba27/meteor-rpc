@@ -7,6 +7,7 @@ import {
   createClient,
   createSafeCaller,
   createRealtimeQuery,
+  createSharedRealtimeQuery,
 } from "./lib";
 
 import {
@@ -29,4 +30,5 @@ export {
   createClient,
   createSafeCaller,
   createRealtimeQuery,
+  createSharedRealtimeQuery
 };

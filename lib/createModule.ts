@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Config, ReturnMethod, ReturnSubscription } from "../types";
-import { createMethod, createRealtimeQuery } from "../server-main";
+import { createMethod, createRealtimeQuery, createSharedRealtimeQuery } from "../server-main";
 // @ts-ignore
 import { Meteor, Subscription as MeteorSubscription } from "meteor/meteor";
 // @ts-ignore
@@ -76,6 +76,55 @@ export const createModule = <
     const nameWithPrefix = prefix ? `${prefix}.${name}` : name;
     const obj = {
       [name]: createRealtimeQuery(nameWithPrefix, schema, resolver, config),
+    };
+    return createModule<
+      RouteName,
+      Submodules &
+        Record<
+          Name,
+          ReturnSubscription<
+            RouteName extends undefined ? Name : `${RouteName}.${Name}`,
+            Schema,
+            T
+          >
+        >
+    >(
+      prefix,
+      {
+        ...subModules,
+        ...obj,
+      } as Submodules &
+        Record<
+          Name,
+          ReturnSubscription<
+            RouteName extends undefined ? Name : `${RouteName}.${Name}`,
+            Schema,
+            T
+          >
+        >,
+      middlewares
+    );
+  };
+
+  const addSharedPublication = <
+    Name extends string,
+    Schema extends z.ZodUndefined | z.ZodTypeAny,
+    T,
+    UnwrappedArgs extends unknown[] = Schema extends z.ZodUndefined
+      ? []
+      : [z.input<Schema>]
+  >(
+    name: Name,
+    schema: Schema,
+    resolver: (
+      this: MeteorSubscription,
+      args: UnwrappedArgs
+    ) => Array<Mongo.Cursor<T>> | Promise<Array<Mongo.Cursor<T>>>,
+    config?: Config<UnwrappedArgs, T>
+  ) => {
+    const nameWithPrefix = prefix ? `${prefix}.${name}` : name;
+    const obj = {
+      [name]: createSharedRealtimeQuery(nameWithPrefix, schema, resolver, config),
     };
     return createModule<
       RouteName,
@@ -191,6 +240,7 @@ export const createModule = <
     addMethod,
     addSubmodule,
     addPublication,
+    addSharedPublication,
     build,
     buildSubmodule,
     addMiddlewares,
