@@ -17,6 +17,8 @@ const MODULE_METHODS = new Set([
 function init(modules) {
     const ts = modules.typescript;
     function create(info) {
+        const log = (msg) => info.project.projectService.logger.info(`[meteor-rpc] ${msg}`);
+        log(`plugin loaded (TypeScript ${ts.version})`);
         // Build a pass-through proxy wrapping the real language service
         const proxy = Object.create(null);
         for (const k of Object.keys(info.languageService)) {
@@ -30,32 +32,50 @@ function init(modules) {
             const prior = info.languageService.getDefinitionAndBoundSpan(fileName, position);
             try {
                 const program = info.languageService.getProgram();
-                if (!program)
+                if (!program) {
+                    log("getDefinition: no program");
                     return prior;
+                }
                 const sourceFile = program.getSourceFile(fileName);
-                if (!sourceFile)
+                if (!sourceFile) {
+                    log(`getDefinition: no sourceFile for ${fileName}`);
                     return prior;
+                }
                 // Find the AST node under the cursor
                 const node = getNodeAtPosition(sourceFile, position);
-                if (!node || !ts.isIdentifier(node))
+                if (!node || !ts.isIdentifier(node)) {
+                    log(`getDefinition: no identifier at position ${position}`);
                     return prior;
+                }
+                log(`getDefinition: identifier "${node.text}"`);
                 const checker = program.getTypeChecker();
                 const symbol = checker.getSymbolAtLocation(node);
-                if (!symbol)
+                if (!symbol) {
+                    log(`getDefinition: no symbol for "${node.text}"`);
                     return prior;
+                }
                 // Resolve the type and check if it carries a `config.name` literal —
                 // both ReturnMethod<Name, ...> and ReturnSubscription<Name, ...> have this.
                 const decl = (_a = symbol.valueDeclaration) !== null && _a !== void 0 ? _a : (_b = symbol.declarations) === null || _b === void 0 ? void 0 : _b[0];
-                if (!decl)
+                if (!decl) {
+                    log(`getDefinition: no declaration for "${node.text}"`);
                     return prior;
+                }
                 const type = checker.getTypeOfSymbolAtLocation(symbol, decl);
+                log(`getDefinition: type is "${checker.typeToString(type)}"`);
                 const methodName = extractMethodName(type, checker);
-                if (!methodName)
+                if (!methodName) {
+                    log(`getDefinition: type has no config.name — not a ReturnMethod/ReturnSubscription`);
                     return prior;
+                }
+                log(`getDefinition: resolved method name "${methodName}" — searching project files`);
                 // Search the project for the matching registration call site
                 const definition = findDefinition(methodName, program, sourceFile);
-                if (!definition)
+                if (!definition) {
+                    log(`getDefinition: no call site found for "${methodName}"`);
                     return prior;
+                }
+                log(`getDefinition: found call site in ${definition.fileName}`);
                 return {
                     textSpan: ts.createTextSpanFromBounds(node.getStart(sourceFile), node.getEnd()),
                     definitions: [definition],
@@ -63,6 +83,7 @@ function init(modules) {
             }
             catch (_e) {
                 // Never break the language service — fall back to default behaviour
+                log(`getDefinition: caught error — ${_e}`);
                 return prior;
             }
         };

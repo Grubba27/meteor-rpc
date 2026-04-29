@@ -405,11 +405,7 @@ meteor-rpc ships a TypeScript language server plugin that redirects **Go to Defi
 }
 ```
 
-The compiled plugin ships inside the `meteor-rpc` npm package, so no extra install is needed. If you installed meteor-rpc only via Atmosphere (`meteor add grubba:rpc`) without the npm install, run:
-
-```bash
-meteor npm i meteor-rpc
-```
+The compiled plugin ships inside the `meteor-rpc` npm package, so no extra install is needed.
 
 **2. VS Code only — switch to workspace TypeScript**
 

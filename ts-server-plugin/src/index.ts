@@ -21,6 +21,11 @@ function init(modules: { typescript: typeof ts }) {
   const ts = modules.typescript;
 
   function create(info: ts.server.PluginCreateInfo) {
+    const log = (msg: string) =>
+      info.project.projectService.logger.info(`[meteor-rpc] ${msg}`);
+
+    log(`plugin loaded (TypeScript ${ts.version})`);
+
     // Build a pass-through proxy wrapping the real language service
     const proxy: ts.LanguageService = Object.create(null);
     for (const k of Object.keys(info.languageService) as Array<
@@ -41,30 +46,38 @@ function init(modules: { typescript: typeof ts }) {
 
       try {
         const program = info.languageService.getProgram();
-        if (!program) return prior;
+        if (!program) { log("getDefinition: no program"); return prior; }
 
         const sourceFile = program.getSourceFile(fileName);
-        if (!sourceFile) return prior;
+        if (!sourceFile) { log(`getDefinition: no sourceFile for ${fileName}`); return prior; }
 
         // Find the AST node under the cursor
         const node = getNodeAtPosition(sourceFile, position);
-        if (!node || !ts.isIdentifier(node)) return prior;
+        if (!node || !ts.isIdentifier(node)) { log(`getDefinition: no identifier at position ${position}`); return prior; }
+
+        log(`getDefinition: identifier "${node.text}"`);
 
         const checker = program.getTypeChecker();
         const symbol = checker.getSymbolAtLocation(node);
-        if (!symbol) return prior;
+        if (!symbol) { log(`getDefinition: no symbol for "${node.text}"`); return prior; }
 
         // Resolve the type and check if it carries a `config.name` literal —
         // both ReturnMethod<Name, ...> and ReturnSubscription<Name, ...> have this.
         const decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
-        if (!decl) return prior;
+        if (!decl) { log(`getDefinition: no declaration for "${node.text}"`); return prior; }
         const type = checker.getTypeOfSymbolAtLocation(symbol, decl);
+        log(`getDefinition: type is "${checker.typeToString(type)}"`);
+
         const methodName = extractMethodName(type, checker);
-        if (!methodName) return prior;
+        if (!methodName) { log(`getDefinition: type has no config.name — not a ReturnMethod/ReturnSubscription`); return prior; }
+
+        log(`getDefinition: resolved method name "${methodName}" — searching project files`);
 
         // Search the project for the matching registration call site
         const definition = findDefinition(methodName, program, sourceFile);
-        if (!definition) return prior;
+        if (!definition) { log(`getDefinition: no call site found for "${methodName}"`); return prior; }
+
+        log(`getDefinition: found call site in ${definition.fileName}`);
 
         return {
           textSpan: ts.createTextSpanFromBounds(
@@ -75,6 +88,7 @@ function init(modules: { typescript: typeof ts }) {
         };
       } catch (_e) {
         // Never break the language service — fall back to default behaviour
+        log(`getDefinition: caught error — ${_e}`);
         return prior;
       }
     };
