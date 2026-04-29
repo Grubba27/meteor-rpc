@@ -32,7 +32,7 @@ This produces `ts-server-plugin/dist/index.js`, which is what tsserver loads.
 ```json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "meteor-rpc/ts-server-plugin" }]
+    "plugins": [{ "name": "meteor-rpc" }]
   }
 }
 ```
@@ -95,7 +95,7 @@ The quickest way to verify the plugin is working:
 Open the command palette and run **"TypeScript: Open TS Server Log"**. Search the log for `meteor-rpc` — you should see a line like:
 
 ```
-Loading plugin meteor-rpc/ts-server-plugin from ...
+Loading plugin meteor-rpc from ...
 ```
 
 If the line is absent, tsserver has not found the plugin. Double-check that:

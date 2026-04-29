@@ -28,7 +28,6 @@ function init(modules) {
         // Override Go-to-Definition to redirect method/publication name strings
         // back to their createMethod / addMethod call sites.
         proxy.getDefinitionAndBoundSpan = (fileName, position) => {
-            var _a, _b;
             const prior = info.languageService.getDefinitionAndBoundSpan(fileName, position);
             try {
                 const program = info.languageService.getProgram();
@@ -49,28 +48,29 @@ function init(modules) {
                 }
                 log(`getDefinition: identifier "${node.text}"`);
                 const checker = program.getTypeChecker();
-                const symbol = checker.getSymbolAtLocation(node);
-                if (!symbol) {
-                    log(`getDefinition: no symbol for "${node.text}"`);
-                    return prior;
-                }
                 // Resolve the type and check if it carries a `config.name` literal —
                 // both ReturnMethod<Name, ...> and ReturnSubscription<Name, ...> have this.
-                const decl = (_a = symbol.valueDeclaration) !== null && _a !== void 0 ? _a : (_b = symbol.declarations) === null || _b === void 0 ? void 0 : _b[0];
-                if (!decl) {
-                    log(`getDefinition: no declaration for "${node.text}"`);
-                    return prior;
-                }
-                const type = checker.getTypeOfSymbolAtLocation(symbol, decl);
+                // Use getTypeAtLocation on the identifier node directly — this is the
+                // most reliable way to get the type of a property access in TS 4 and 5.
+                const type = checker.getTypeAtLocation(node);
                 log(`getDefinition: type is "${checker.typeToString(type)}"`);
-                const methodName = extractMethodName(type, checker);
+                const methodName = extractMethodName(type, checker, node);
                 if (!methodName) {
                     log(`getDefinition: type has no config.name — not a ReturnMethod/ReturnSubscription`);
                     return prior;
                 }
                 log(`getDefinition: resolved method name "${methodName}" — searching project files`);
+                // For submodule methods the full name is e.g. "example.exampleMethod"
+                // but the call site uses the local name "exampleMethod" inside createModule("example").
+                // Try the full name first, then fall back to the last dotted segment.
+                const localName = methodName.includes(".")
+                    ? methodName.slice(methodName.lastIndexOf(".") + 1)
+                    : methodName;
                 // Search the project for the matching registration call site
-                const definition = findDefinition(methodName, program, sourceFile);
+                const definition = findDefinition(methodName, program, sourceFile) ||
+                    (localName !== methodName
+                        ? findDefinition(localName, program, sourceFile)
+                        : undefined);
                 if (!definition) {
                     log(`getDefinition: no call site found for "${methodName}"`);
                     return prior;
@@ -105,25 +105,27 @@ function init(modules) {
          * If `type` is ReturnMethod<Name, ...> or ReturnSubscription<Name, ...>,
          * returns the literal string value of the `config.name` property.
          */
-        function extractMethodName(type, checker) {
-            var _a, _b, _c, _d;
+        function extractMethodName(type, checker, contextNode) {
             const configProp = type.getProperty("config");
             if (!configProp)
                 return undefined;
-            const configDecl = (_a = configProp.valueDeclaration) !== null && _a !== void 0 ? _a : (_b = configProp.declarations) === null || _b === void 0 ? void 0 : _b[0];
-            if (!configDecl)
-                return undefined;
-            const configType = checker.getTypeOfSymbolAtLocation(configProp, configDecl);
+            const configType = checker.getTypeOfSymbolAtLocation(configProp, contextNode);
             const nameProp = configType.getProperty("name");
             if (!nameProp)
                 return undefined;
-            const nameDecl = (_c = nameProp.valueDeclaration) !== null && _c !== void 0 ? _c : (_d = nameProp.declarations) === null || _d === void 0 ? void 0 : _d[0];
-            if (!nameDecl)
-                return undefined;
-            const nameType = checker.getTypeOfSymbolAtLocation(nameProp, nameDecl);
-            if (!nameType.isStringLiteral())
-                return undefined;
-            return nameType.value;
+            const nameType = checker.getTypeOfSymbolAtLocation(nameProp, contextNode);
+            // The Name type parameter may be a union like:
+            //   "createChatRoom" | `${string}.createChatRoom`
+            // Pick the first plain string-literal member from the union.
+            if (nameType.isStringLiteral())
+                return nameType.value;
+            if (nameType.isUnion()) {
+                for (const member of nameType.types) {
+                    if (member.isStringLiteral())
+                        return member.value;
+                }
+            }
+            return undefined;
         }
         /**
          * Walks all (non-declaration) source files in the program looking for a

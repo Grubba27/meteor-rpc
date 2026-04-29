@@ -1,6 +1,6 @@
 {
   "name": "meteor-rpc",
-  "version": "1.2.0-beta.2",
+  "version": "1.2.0-beta.4",
   "private": false,
   "description": "RPC e2e safe",
   "devDependencies": {
@@ -16,7 +16,8 @@
     "build:plugin": "cd ts-server-plugin && npm install && npm run build",
     "prepublishOnly": "npm run build:plugin"
   },
-  "main": "server-main.ts",
+  "main": "ts-server-plugin/dist/index.js",
+  "types": "server-main.ts",
   "license": "MIT",
   "dependencies": {
     "@tanstack/react-query": "^5.61.0",

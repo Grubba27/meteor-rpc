@@ -400,7 +400,7 @@ meteor-rpc ships a TypeScript language server plugin that redirects **Go to Defi
 ```json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "meteor-rpc/ts-server-plugin" }]
+    "plugins": [{ "name": "meteor-rpc" }]
   }
 }
 ```

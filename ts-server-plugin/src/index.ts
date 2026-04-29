@@ -58,23 +58,32 @@ function init(modules: { typescript: typeof ts }) {
         log(`getDefinition: identifier "${node.text}"`);
 
         const checker = program.getTypeChecker();
-        const symbol = checker.getSymbolAtLocation(node);
-        if (!symbol) { log(`getDefinition: no symbol for "${node.text}"`); return prior; }
 
         // Resolve the type and check if it carries a `config.name` literal —
         // both ReturnMethod<Name, ...> and ReturnSubscription<Name, ...> have this.
-        const decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
-        if (!decl) { log(`getDefinition: no declaration for "${node.text}"`); return prior; }
-        const type = checker.getTypeOfSymbolAtLocation(symbol, decl);
+        // Use getTypeAtLocation on the identifier node directly — this is the
+        // most reliable way to get the type of a property access in TS 4 and 5.
+        const type = checker.getTypeAtLocation(node);
         log(`getDefinition: type is "${checker.typeToString(type)}"`);
 
-        const methodName = extractMethodName(type, checker);
+        const methodName = extractMethodName(type, checker, node);
         if (!methodName) { log(`getDefinition: type has no config.name — not a ReturnMethod/ReturnSubscription`); return prior; }
 
         log(`getDefinition: resolved method name "${methodName}" — searching project files`);
 
+        // For submodule methods the full name is e.g. "example.exampleMethod"
+        // but the call site uses the local name "exampleMethod" inside createModule("example").
+        // Try the full name first, then fall back to the last dotted segment.
+        const localName = methodName.includes(".")
+          ? methodName.slice(methodName.lastIndexOf(".") + 1)
+          : methodName;
+
         // Search the project for the matching registration call site
-        const definition = findDefinition(methodName, program, sourceFile);
+        const definition =
+          findDefinition(methodName, program, sourceFile) ||
+          (localName !== methodName
+            ? findDefinition(localName, program, sourceFile)
+            : undefined);
         if (!definition) { log(`getDefinition: no call site found for "${methodName}"`); return prior; }
 
         log(`getDefinition: found call site in ${definition.fileName}`);
@@ -121,22 +130,28 @@ function init(modules: { typescript: typeof ts }) {
      */
     function extractMethodName(
       type: ts.Type,
-      checker: ts.TypeChecker
+      checker: ts.TypeChecker,
+      contextNode: ts.Node
     ): string | undefined {
       const configProp = type.getProperty("config");
       if (!configProp) return undefined;
-      const configDecl = configProp.valueDeclaration ?? configProp.declarations?.[0];
-      if (!configDecl) return undefined;
-      const configType = checker.getTypeOfSymbolAtLocation(configProp, configDecl);
+      const configType = checker.getTypeOfSymbolAtLocation(configProp, contextNode);
 
       const nameProp = configType.getProperty("name");
       if (!nameProp) return undefined;
-      const nameDecl = nameProp.valueDeclaration ?? nameProp.declarations?.[0];
-      if (!nameDecl) return undefined;
-      const nameType = checker.getTypeOfSymbolAtLocation(nameProp, nameDecl);
-      if (!nameType.isStringLiteral()) return undefined;
+      const nameType = checker.getTypeOfSymbolAtLocation(nameProp, contextNode);
 
-      return nameType.value;
+      // The Name type parameter may be a union like:
+      //   "createChatRoom" | `${string}.createChatRoom`
+      // Pick the first plain string-literal member from the union.
+      if (nameType.isStringLiteral()) return nameType.value;
+      if (nameType.isUnion()) {
+        for (const member of nameType.types) {
+          if (member.isStringLiteral()) return member.value;
+        }
+      }
+
+      return undefined;
     }
 
     /**
