@@ -388,3 +388,46 @@ server.name.addErrorResolveHook((err, raw, parsed) => {
 
 server = server.build();
 ```
+
+## Go to Definition (TypeScript Server Plugin)
+
+meteor-rpc ships a TypeScript language server plugin that redirects **Go to Definition** (`F12` / `Ctrl+B`) from a client call site directly to the matching `addMethod` / `createMethod` / `addPublication` call on the server — no code changes required.
+
+### Setup
+
+**1. Add the plugin to your `tsconfig.json`**
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "meteor-rpc/ts-server-plugin" }]
+  }
+}
+```
+
+The compiled plugin ships inside the `meteor-rpc` npm package, so no extra install is needed. If you installed meteor-rpc only via Atmosphere (`meteor add grubba:rpc`) without the npm install, run:
+
+```bash
+meteor npm i meteor-rpc
+```
+
+**2. VS Code only — switch to workspace TypeScript**
+
+VS Code uses its own bundled TypeScript by default and ignores `tsconfig.json` plugins until you switch:
+
+1. Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`).
+2. Run **"TypeScript: Select TypeScript Version"**.
+3. Choose **"Use Workspace Version"**.
+
+This writes one line to `.vscode/settings.json` and is a one-time step. Other editors (Cursor, Neovim + tsserver, WebStorm) pick up `tsconfig.json` plugins automatically.
+
+### Result
+
+```typescript
+const app = createClient<Server>();
+
+app.bar("str");      // F12 on `bar`      → jumps to .addMethod("bar", ...)
+app.chat.createChat(); // F12 on `createChat` → jumps to .addMethod("createChat", ...)
+```
+
+Works with `addMethod`, `addPublication`, `addSharedPublication`, `createMethod`, `createQuery`, `createMutation`, `createPublication`, `createRealtimeQuery`, and `createSharedRealtimeQuery`.
