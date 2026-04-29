@@ -395,6 +395,8 @@ meteor-rpc ships a TypeScript language server plugin that redirects **Go to Defi
 
 ### Setup
 
+having installed `meteor-rpc-ts-plugin` and added it to `tsconfig.json` (see below), you should be able to jump from client calls to server definitions immediately. If not, try restarting the TS server (command palette → **"TypeScript: Restart TS Server"**).
+
 **1. Add the plugin to your `tsconfig.json`**
 
 ```json
@@ -404,8 +406,6 @@ meteor-rpc ships a TypeScript language server plugin that redirects **Go to Defi
   }
 }
 ```
-
-The compiled plugin ships inside the `meteor-rpc` npm package, so no extra install is needed.
 
 **2. VS Code only — switch to workspace TypeScript**
 
