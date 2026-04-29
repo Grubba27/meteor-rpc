@@ -9,7 +9,7 @@ This package provides functions for building E2E type-safe RPCs.
 ## How to download it?
 
 ```bash
-meteor npm i meteor-rpc @tanstack/react-query zod
+meteor npm i meteor-rpc meteor-rpc-ts-plugin @tanstack/react-query zod
 ```
 
 install react query into your project, following their [quick start guide](https://tanstack.com/query/latest/docs/framework/react/quick-start)
@@ -400,7 +400,7 @@ meteor-rpc ships a TypeScript language server plugin that redirects **Go to Defi
 ```json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "meteor-rpc" }]
+    "plugins": [{ "name": "meteor-rpc-ts-plugin" }]
   }
 }
 ```

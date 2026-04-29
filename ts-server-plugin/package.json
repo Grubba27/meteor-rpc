@@ -1,5 +1,5 @@
 {
-  "name": "meteor-rpc-ts-server-plugin",
+  "name": "meteor-rpc-ts-plugin",
   "version": "1.0.0",
   "description": "TypeScript language server plugin for meteor-rpc — enables Go-to-Definition on method/publication names",
   "main": "dist/index.js",

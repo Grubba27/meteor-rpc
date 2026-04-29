@@ -17,27 +17,23 @@ If no match is found it falls back to the default TypeScript behavior silently.
 
 ## Setup
 
-### 1. Build the plugin (first time only)
+### 1. Install
 
 ```sh
-cd ts-server-plugin
-npm install
-npm run build
+meteor npm i meteor-rpc-ts-plugin
 ```
-
-This produces `ts-server-plugin/dist/index.js`, which is what tsserver loads.
 
 ### 2. Add the plugin to your project's `tsconfig.json`
 
 ```json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "meteor-rpc" }]
+    "plugins": [{ "name": "meteor-rpc-ts-plugin" }]
   }
 }
 ```
 
-The plugin name resolves to the package's `ts-server-plugin/` folder via Node module resolution, so as long as `meteor-rpc` is installed in the project there is nothing else to install.
+The plugin is a standalone package — install it alongside `meteor-rpc`.
 
 ### 3. VS Code: switch to workspace TypeScript
 
@@ -92,14 +88,14 @@ The quickest way to verify the plugin is working:
 
 ### Confirming the plugin is loaded
 
-Open the command palette and run **"TypeScript: Open TS Server Log"**. Search the log for `meteor-rpc` — you should see a line like:
+Open the command palette and run **"TypeScript: Open TS Server Log"**. Search the log for `meteor-rpc-ts-plugin` — you should see a line like:
 
 ```
-Loading plugin meteor-rpc from ...
+Loading plugin meteor-rpc-ts-plugin from ...
 ```
 
 If the line is absent, tsserver has not found the plugin. Double-check that:
-- `npm run build` has been run and `dist/index.js` exists.
+- `meteor-rpc-ts-plugin` is installed (`node_modules/meteor-rpc-ts-plugin/` exists).
 - The `plugins` entry in `tsconfig.json` is under `compilerOptions`.
 - VS Code is set to use workspace TypeScript.
 
