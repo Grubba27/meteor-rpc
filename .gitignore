@@ -1,1 +1,8 @@
 node_modules
+dist
+coverage
+*.tgz
+.DS_Store
+.idea
+examples/*/node_modules
+examples/*/.meteor/local

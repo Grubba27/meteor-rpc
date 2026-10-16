@@ -1,15 +1,10 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "esModuleInterop": true,
-    "lib": ["DOM", "ESNext"],
-    "module": "ES6",
-    "moduleResolution": "node",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "noEmit": true,
-    "strict": true,
-    "target": "ESNext",
-    "skipLibCheck": true,
-    "declaration": true,
-    "declarationMap": true
+    "types": ["node"]
   },
-  "files": ["./server-main.ts"]
+  "include": ["src", "tests", "vitest.config.mts"]
 }
