@@ -19,9 +19,10 @@ new builder. Nothing is registered with Meteor until `build()`.
 
 ```ts
 import { createModule } from "meteor-rpc/server";
+import { z } from "zod";
 
 const chat = createModule("chat") // a namespaced submodule
-  .addMethod(/* … */)
+  .addMethod("send", z.string(), (text) => `You said: ${text}`)
   .buildSubmodule();
 
 const server = createModule() // the root module: no namespace

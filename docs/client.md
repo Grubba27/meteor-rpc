@@ -71,7 +71,7 @@ Subscriptions need a client connection. On the server with the default connectio
 Pass any DDP connection:
 
 ```ts
-import { DDP } from "meteor/ddp-client";
+import { DDP } from "meteor/ddp";
 import type { Server as BillingServer } from "@acme/billing-api"; // the other app's exported type
 
 const billing = createClient<BillingServer>({ connection: DDP.connect("https://billing.example.com") });

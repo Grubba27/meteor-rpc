@@ -2,6 +2,7 @@
 // Every test talks to the server over a real DDP connection: DDP.connect(Meteor.absoluteUrl()).
 import "/imports/api/server";
 import "./probe-module";
+import "./browser-module";
 import "./methods.test";
 import "./publications.test";
 import "./modules.test";

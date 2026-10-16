@@ -3,13 +3,18 @@
 //   1. builds the library and packs it (`npm pack`) into ./meteor-rpc.tgz,
 //   2. installs that tarball into examples/basic (package.json points at ../../meteor-rpc.tgz),
 //   3. runs the app's Mocha tests headless (`meteor test --once`, server side, real DDP),
+//      and with --client also its client tests (React hooks) in headless Chromium,
 //   4. type-checks the example app against the packed .d.ts files.
 //
 // Usage:
 //   npm run test:meteor                                # the app's Meteor release (.meteor/release)
+//   npm run test:meteor -- --client                    # also run the client tests in headless Chromium
 //   npm run test:meteor -- --release 3.6-beta.3        # also run on other releases (repeatable; release names, e.g. 3.6-beta.3)
 //   npm run test:meteor -- --setup-only                # build, pack and install; then `cd examples/basic && meteor`
 //   Other flags: --skip-build (reuse meteor-rpc.tgz), --no-typecheck, --port <n> (default 3100)
+//
+// --client drives the browser with meteortesting:mocha's Playwright driver. It downloads Playwright's
+// headless Chromium once (into Playwright's cache); on CI Linux it also installs the system libraries.
 //
 // Needs Meteor installed (https://docs.meteor.com/about/install.html). Exits non-zero on any failure.
 
@@ -33,11 +38,19 @@ const tarball = join(root, "meteor-rpc.tgz"); // must match "meteor-rpc" in exam
 const TEST_TIMEOUT_MS = 15 * 60 * 1000;
 
 function parseArgs(argv) {
-  const options = { releases: [], skipBuild: false, setupOnly: false, typecheck: true, port: 3100 };
+  const options = {
+    releases: [],
+    client: false,
+    skipBuild: false,
+    setupOnly: false,
+    typecheck: true,
+    port: 3100,
+  };
   for (let i = 0; i < argv.length; i++) {
     const [flag, inline] = argv[i].split("=", 2);
     const value = () => inline ?? argv[++i];
     if (flag === "--release") options.releases.push(value());
+    else if (flag === "--client") options.client = true;
     else if (flag === "--skip-build") options.skipBuild = true;
     else if (flag === "--setup-only") options.setupOnly = true;
     else if (flag === "--no-typecheck") options.typecheck = false;
@@ -128,6 +141,14 @@ async function buildAndPack() {
   return join(packDir, filename);
 }
 
+/** Downloads the headless Chromium that meteortesting:mocha's Playwright driver launches. */
+async function installBrowser() {
+  log("Installing headless Chromium for the client tests");
+  const args = ["install", "chromium", "--only-shell"];
+  if (process.env.CI && process.platform === "linux") args.push("--with-deps");
+  await mustRun(join(app, "node_modules", ".bin", "playwright"), args, { cwd: app });
+}
+
 async function install(packed) {
   copyFileSync(packed, tarball);
   rmSync(dirname(packed), { recursive: true, force: true });
@@ -138,7 +159,7 @@ async function install(packed) {
 }
 
 /** Runs the Mocha suite with one Meteor release. Returns true when it passed. */
-async function runTests(release, port) {
+async function runTests(release, { port, client }) {
   const appRelease = readFileSync(join(app, ".meteor", "release"), "utf8")
     .trim()
     .replace("METEOR@", "");
@@ -157,7 +178,9 @@ async function runTests(release, port) {
   // `meteor test` adds the driver packages (meteortesting:*) to .meteor/versions; put it back.
   const versionsFile = join(cwd, ".meteor", "versions");
   const versions = readFileSync(versionsFile, "utf8");
-  log(`Running the integration tests with Meteor ${release ?? appRelease}`);
+  log(
+    `Running the ${client ? "server and client" : "server"} tests with Meteor ${release ?? appRelease}`,
+  );
   const args = [
     "test",
     "--once",
@@ -169,7 +192,11 @@ async function runTests(release, port) {
   if (release) args.push("--release", release);
   const { code, output } = await run("meteor", args, {
     cwd,
-    env: { TEST_CLIENT: "0" },
+    env: {
+      ...(client ? { TEST_CLIENT: "1", TEST_BROWSER_DRIVER: "playwright" } : { TEST_CLIENT: "0" }),
+      // The Playwright driver imports playwright from $PWD/node_modules, and spawn doesn't set PWD.
+      PWD: cwd,
+    },
     timeout: TEST_TIMEOUT_MS,
   });
   if (!copy) writeFileSync(versionsFile, versions);
@@ -194,6 +221,8 @@ async function main() {
     await mustRun("npm", ["install", "--no-package-lock", "--no-audit", "--no-fund"], { cwd: app });
   }
 
+  if (options.client) await installBrowser();
+
   if (options.setupOnly) {
     log(`Ready. Start the example with: cd ${relative(process.cwd(), app) || "."} && meteor`);
     return;
@@ -202,8 +231,8 @@ async function main() {
   const results = [];
   for (const release of [undefined, ...options.releases]) {
     results.push({
-      release: release ?? "app release",
-      passed: await runTests(release, options.port),
+      release: `${release ?? "app release"}${options.client ? " (server + client)" : ""}`,
+      passed: await runTests(release, options),
     });
   }
 

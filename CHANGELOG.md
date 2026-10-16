@@ -50,6 +50,8 @@ runtime bugs of 1.x. Upgrade guide: [MIGRATION.md](./MIGRATION.md). There's a co
 - Compile-time checks for reserved, dotted and duplicate names, and for `build()` /
   `buildSubmodule()` misuse.
 - Works with React 19 (#7) and Meteor 3.6 native types.
+- Agent skills shipped in the package: `skills/meteor-rpc` (writing methods, publications and React
+  code, #15) and `skills/migrate-to-v2`.
 
 ### Fixed
 

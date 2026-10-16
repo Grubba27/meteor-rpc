@@ -57,9 +57,11 @@ Methods without input are called with `mutate()` and `useQuery()`.
   TanStack Query API: `useQuery`, `useQueries`, `queryClient.prefetchQuery`, `ensureQueryData`, ….
 - **`api.x.mutationOptions(options?)`** returns `{ mutationKey, mutationFn, ...options }`.
 
-```ts
+```tsx
 // prefetch on hover
-onMouseEnter={() => queryClient.prefetchQuery(api.users.get.queryOptions({ id }))}
+<a href={`/users/${id}`} onMouseEnter={() => queryClient.prefetchQuery(api.users.get.queryOptions({ id }))}>
+  Profile
+</a>
 ```
 
 ## Publications

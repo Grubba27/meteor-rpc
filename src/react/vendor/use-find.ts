@@ -5,9 +5,12 @@
 // Changes from upstream:
 // - typed against meteor-rpc's Meteor boundary instead of `meteor/*` declarations;
 // - `useReducer` called in the form both @types/react 18 and 19 accept;
-// - client only: meteor-rpc never reads publication data during server-side rendering.
+// - client only: meteor-rpc never reads publication data during server-side rendering;
+// - observer updates wait until the component commits (then resync once if any were missed),
+//   so a list that rendered but never mounted, e.g. while a sibling suspends, doesn't trigger
+//   React's "state update on a component that hasn't mounted yet" warning.
 
-import { type DependencyList, useEffect, useMemo, useReducer } from "react";
+import { type DependencyList, useEffect, useMemo, useReducer, useRef } from "react";
 import { Meteor } from "../../meteor/meteor.js";
 import { type Cursor, Mongo } from "../../meteor/mongo.js";
 import { Tracker } from "../../meteor/tracker.js";
@@ -91,25 +94,43 @@ export function useFind<T>(
     () => (isCursor<T>(cursor) ? fetchData(cursor) : []),
   );
 
+  const mounted = useRef(false);
+  const missedUpdates = useRef(false);
+  const dispatchWhenMounted = (action: Action<T>) => {
+    if (mounted.current) dispatch(action);
+    else missedUpdates.current = true;
+  };
+
   useSyncEffect(() => {
     if (!isCursor<T>(cursor)) return undefined;
     dispatch({ type: "refresh", data: fetchData(cursor) });
     const observer = cursor.observe({
       addedAt(document, atIndex) {
-        dispatch({ type: "addedAt", document, atIndex });
+        dispatchWhenMounted({ type: "addedAt", document, atIndex });
       },
       changedAt(newDocument, _oldDocument, atIndex) {
-        dispatch({ type: "changedAt", document: newDocument, atIndex });
+        dispatchWhenMounted({ type: "changedAt", document: newDocument, atIndex });
       },
       removedAt(_oldDocument, atIndex) {
-        dispatch({ type: "removedAt", atIndex });
+        dispatchWhenMounted({ type: "removedAt", atIndex });
       },
       movedTo(_document, fromIndex, toIndex) {
-        dispatch({ type: "movedTo", fromIndex, toIndex });
+        dispatchWhenMounted({ type: "movedTo", fromIndex, toIndex });
       },
       _suppress_initial: true,
     });
     return () => observer.stop();
+  }, [cursor]);
+
+  useEffect(() => {
+    mounted.current = true;
+    if (missedUpdates.current && isCursor<T>(cursor)) {
+      missedUpdates.current = false;
+      dispatch({ type: "refresh", data: fetchData(cursor) });
+    }
+    return () => {
+      mounted.current = false;
+    };
   }, [cursor]);
 
   return cursor ? data : cursor;

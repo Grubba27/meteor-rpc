@@ -29,7 +29,7 @@ runtime), on Meteor 3.0+.
 | `tests/unit/` | vitest against `tests/fakes/` (in-memory Meteor: DDP-like wire, merge box, Tracker, minimongo-ish stores). |
 | `tests/types/` | Type-level contract (`expectTypeOf`, `@ts-expect-error`). |
 | `examples/basic/` | Real Meteor 3 app consuming the packed tarball; its tests are `npm run test:meteor`. |
-| `scripts/` | `consumer-check.mjs` (type-checks a packed consumer against every Meteor type provider, TS 5.9/7, zod/valibot/arktype, React 18/19 types, strict tsconfigs), `meteor-test.mjs` (real Meteor), `esm-types.mjs` (build step: ESM-format copy of the declarations for the `import` condition). |
+| `scripts/` | `consumer-check.mjs` (type-checks a packed consumer against every Meteor type provider, TS 5.9/7, zod/valibot/arktype, React 18/19 types, strict tsconfigs), `meteor-test.mjs` (real Meteor; `--client` adds the React hooks in headless Chromium), `docs-snippets.mjs` (type-checks every ts/tsx block of README.md and docs/), `mark-esm.mjs` (build step: marks `dist/esm` as ES modules). |
 | `docs/`, `README.md`, `MIGRATION.md`, `CHANGELOG.md`, `CONTRIBUTING.md` | User and contributor docs. |
 | `skills/migrate-to-v2/` | Agent skill shipped in the npm package, for migrating consumer apps. |
 
@@ -109,9 +109,10 @@ runtime), on Meteor 3.0+.
 | `npm test` | Unit tests (~1 s). Filter: `npx vitest run tests/unit/methods.test.ts -t "middlewares"` |
 | `npm run test:types` | Type contract tests |
 | `npm run typecheck` | `tsc -p tsconfig.json` (src + tests, bundler resolution) |
-| `npm run build` | `tsc -p tsconfig.build.json` (node16 resolution, CommonJS JS, `.d.ts`), then `scripts/esm-types.mjs` |
+| `npm run build` | `tsc -p tsconfig.build.json` (CommonJS + `.d.ts`), `tsc -p tsconfig.esm.json` (ESM + `.d.ts` in `dist/esm`), then `scripts/mark-esm.mjs` |
 | `npm run test:consumer` | Slow (minutes). Run it when you change public types. |
-| `npm run test:meteor` | Needs Meteor. Run it when you change `src/server`, `src/client/transport.ts` or `src/react`. |
+| `npm run test:docs` | Type-checks the code blocks of README.md and docs/ against the packed build. Run it when you change docs or public types. |
+| `npm run test:meteor` | Needs Meteor. Run it when you change `src/server`, `src/client/transport.ts` or `src/react`. Add `-- --client` for the React hooks in headless Chromium (Playwright), `-- --release 3.6-beta.3` for another Meteor release. |
 
 ## Gotchas
 
@@ -136,6 +137,6 @@ runtime), on Meteor 3.0+.
 - [ ] `npm run check` passes. Ran `npm run test:meteor` if runtime behavior changed.
 - [ ] New behavior has a unit test (and a real-Meteor test if it involves DDP, Mongo or the merge
       box). New types have a `tests/types` assertion.
-- [ ] Docs updated (`docs/`, README if user-facing). `CHANGELOG.md` has an "Unreleased" entry.
+- [ ] Docs updated (`docs/`, README if user-facing), and `npm run test:docs` passes. `CHANGELOG.md` has an "Unreleased" entry.
 - [ ] No invariant above broken. If one must break, stop and open an issue instead.
 - [ ] Don't bump versions or publish; maintainers do that (see CONTRIBUTING.md › Releasing).

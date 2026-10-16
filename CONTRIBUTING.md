@@ -18,14 +18,15 @@ Node 20 or later. You need Meteor only for `npm run test:meteor`.
 
 | Command | What it does | Needs Meteor |
 | --- | --- | --- |
-| `npm run check` | lint + typecheck + unit tests + type tests + build + consumer type-check. Run it before every PR. | no |
+| `npm run check` | lint + typecheck + unit tests + type tests + build + consumer type-check + docs snippets. Run it before every PR. | no |
 | `npm run lint` / `npm run format` | Biome check / auto-fix | no |
 | `npm run typecheck` | `tsc` on `src` and `tests` | no |
 | `npm test` | Unit tests (vitest) against an in-memory fake of Meteor (`tests/fakes`) | no |
 | `npm run test:types` | Type-level tests (`tests/types`): the public API's type contract | no |
 | `npm run build` | Compiles `src` to `dist` (CommonJS + `.d.ts`) | no |
 | `npm run test:consumer` | Packs the library and type-checks a consumer app against every Meteor type provider and TypeScript 5.9 / 7 | no |
-| `npm run test:meteor` | Packs the library into `examples/basic` and runs its integration tests in a real Meteor | yes |
+| `npm run test:docs` | Type-checks every `ts`/`tsx` code block in README.md and `docs/` against the packed build | no |
+| `npm run test:meteor` | Packs the library into `examples/basic` and runs its integration tests in a real Meteor. `-- --client` adds the React hook tests in headless Chromium; `-- --release <name>` runs on another Meteor release too. | yes |
 
 ## Where things go
 
@@ -68,6 +69,6 @@ If a change would break any of the above, open an issue first.
 ## Releasing (maintainers)
 
 1. Move "Unreleased" in `CHANGELOG.md` to the new version, and bump `package.json`.
-2. Run `npm run check` and `npm run test:meteor`.
+2. Run `npm run check` and `npm run test:meteor -- --client --release <latest Meteor beta>`.
 3. Publish: `npm publish` for stable releases, `npm publish --tag next` for prereleases. Never
    publish a prerelease without a tag, or it becomes `latest`.

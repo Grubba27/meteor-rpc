@@ -154,6 +154,7 @@ A complete app lives in [`examples/basic`](./examples/basic).
 - [Errors and validation](./docs/errors.md)
 - [TypeScript: type providers, Meteor 3.6 native types, inference](./docs/typescript.md)
 - [Troubleshooting](./docs/troubleshooting.md)
+- [Agent skill for writing meteor-rpc code](./skills/meteor-rpc/SKILL.md) (Claude Code, Codex, Cursor, …): `cp -r node_modules/meteor-rpc/skills/meteor-rpc .claude/skills/`
 - [Migrating from 1.x](./MIGRATION.md) · [Changelog](./CHANGELOG.md) · [Contributing](./CONTRIBUTING.md)
 
 ## Entry points

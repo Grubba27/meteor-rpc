@@ -39,7 +39,8 @@ jobs:
 
   consumer:
     # Packs the library and type-checks a fixture app against it for every Meteor type
-    # provider, TypeScript 5.9/7, zod/valibot/arktype, @types/react 18/19 (scripts/consumer-check.mjs).
+    # provider, TypeScript 5.9/7, zod/valibot/arktype, @types/react 18/19 (scripts/consumer-check.mjs),
+    # then type-checks the documentation's code blocks (scripts/docs-snippets.mjs).
     name: Consumer type-check matrix
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -63,9 +64,14 @@ jobs:
       - run: npm run test:consumer
         env:
           CONSUMER_CHECK_DIR: ${{ runner.temp }}/meteor-rpc-consumer-check
+      # The ```ts/```tsx blocks of README.md and docs/*.md, against the same build.
+      - run: node scripts/docs-snippets.mjs --skip-build
+        env:
+          DOCS_SNIPPETS_DIR: ${{ runner.temp }}/meteor-rpc-docs-snippets
 
   meteor:
-    # Real Meteor app (examples/basic) running its Mocha suite against the packed tarball.
+    # Real Meteor app (examples/basic) running its Mocha suite against the packed tarball:
+    # server tests over real DDP, then the React hooks in headless Chromium (Playwright).
     name: Meteor integration tests
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -83,5 +89,10 @@ jobs:
       - uses: meteorengineer/setup-meteor@5c24ea96e0e0d1faa1ee1d010740be0ff30a3527 # v3.0.1
         with:
           meteor-release: ${{ steps.meteor.outputs.release }}
+      # Playwright's headless Chromium; the version follows examples/basic/package.json.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('examples/basic/package.json') }}
       - run: npm ci
-      - run: npm run test:meteor
+      - run: npm run test:meteor -- --client
