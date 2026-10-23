@@ -310,6 +310,192 @@ describe("Atmosphere package", () => {
   });
 });
 
+describe("type queries of useQuery (§8)", () => {
+  const source = `${CLIENT}type Account = ReturnType<typeof api.billing.get.useQuery>["data"]["account"];
+type Other = ReturnType<typeof notAClient.x.useQuery>;
+`;
+
+  it("point at useSuspenseQuery, whose data is always defined like 1.x's useQuery", () => {
+    const result = run(source);
+    expect(result.output).toContain(
+      'type Account = ReturnType<typeof api.billing.get.useSuspenseQuery>["data"]["account"];',
+    );
+    expect(result.output).toContain("typeof notAClient.x.useQuery>");
+    expect(summary(result.changes)).toEqual([
+      "3 §8 typeof api.billing.get.useQuery → useSuspenseQuery (1.x useQuery suspended, so its data was always defined)",
+    ]);
+  });
+
+  it("follow type-only imports of the client", () => {
+    const files = { "/app/imports/api/client.ts": CLIENT };
+    const result = run(
+      `import type { api } from "/imports/api/client";\ntype User = ReturnType<typeof api.users.me.useQuery>["data"];\n`,
+      files,
+    );
+    expect(result.output).toContain("typeof api.users.me.useSuspenseQuery>");
+  });
+
+  it("stay with --suspense-client", () => {
+    const result = transform(FILE, source, ts, memoryProject(), { suspenseClient: true });
+    expect(result.output).toContain("typeof api.billing.get.useQuery>");
+  });
+});
+
+describe("grubba-rpc, meteor-rpc's earlier npm name", () => {
+  it("rewrites its imports and mocks, and migrates code that uses it", () => {
+    const source = `import { createClient } from "grubba-rpc";
+export const api = createClient<Server>();
+api.a.useQuery(1, { useQueryOptions: { retry: false } });
+vi.mock("grubba-rpc", () => ({ createModule: vi.fn() }));
+`;
+    const result = run(source);
+    expect(result.output).toBe(`import { createClient } from "meteor-rpc";
+export const api = createClient<Server>();
+api.a.useSuspenseQuery(1, { retry: false });
+vi.mock("meteor-rpc", () => ({ createModule: vi.fn() }));
+`);
+    expect(summary(result.changes)).toEqual([
+      '1 §2 "grubba-rpc" → "meteor-rpc" (meteor-rpc\'s current name',
+      "3 §8 api.a.useQuery() → useSuspenseQuery() (1.x useQuery suspended); options passed directly instead of { useQueryOptions }",
+      '4 §2 "grubba-rpc" → "meteor-rpc" (meteor-rpc\'s current name',
+    ]);
+  });
+});
+
+describe("tsconfig paths", () => {
+  const temporary: string[] = [];
+  afterEach(() => {
+    for (const directory of temporary.splice(0)) fs.rmSync(directory, { recursive: true });
+  });
+
+  it("follows aliases from the host", () => {
+    const contents: Record<string, string> = { "/app/ui/api.ts": CLIENT };
+    const project = createProject(ts, {
+      fileExists: (fileName) => fileName in contents,
+      readFile: (fileName) => contents[fileName],
+      appRoot: () => "/app",
+      pathAliases: () => ({ baseDir: "/app", paths: { "@/ui/*": ["ui/*"], "@api": ["ui/api"] } }),
+    });
+    const source = `import { api } from "@/ui/api";\nimport { api as same } from "@api";\napi.a.useQuery();\nsame.b.useQuery();\n`;
+    const result = transform(FILE, source, ts, project);
+    expect(result.changes).toHaveLength(2);
+    expect(project.resolve(FILE, "@/ui/missing")).toBeUndefined();
+    expect(project.resolve(FILE, "react")).toBeUndefined();
+  });
+
+  it("reads them from the nearest tsconfig.json, with extends", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "meteor-rpc-codemod-paths-"));
+    temporary.push(directory);
+    const write = (name: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(directory, name)), { recursive: true });
+      fs.writeFileSync(path.join(directory, name), text);
+    };
+    write(
+      "tsconfig.base.json",
+      `{ "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["*"] } } }`,
+    );
+    write("tsconfig.json", `// comments are fine\n{ "extends": "./tsconfig.base.json" }`);
+    write("ui/api.ts", CLIENT);
+    write("ui/pages/Home.tsx", `import { api } from "@/ui/api";\napi.a.useQuery();\n`);
+    const [home] = migrateFiles([path.join(directory, "ui/pages/Home.tsx")], ts);
+    expect(home?.result.output).toBe(
+      `import { api } from "@/ui/api";\napi.a.useSuspenseQuery();\n`,
+    );
+  });
+});
+
+describe("1.x method objects: module.submodule.method() (§13)", () => {
+  const users = `import { createModule } from "grubba-rpc";
+import { z } from "zod";
+export const usersModule = createModule("users")
+  .addMethod("getUser", z.void(), getUser)
+  .buildSubmodule();
+`;
+  const files = {
+    "/app/server/users/users.methods.ts": users,
+    "/app/server/users/index.ts": `export * from "./users.methods";\n`,
+  };
+
+  it("calls submodules through createCaller, adding it to an existing import", () => {
+    const source = `import { createModule } from "grubba-rpc";
+import { usersModule } from "/server/users";
+
+export const apps = createModule("apps")
+  .addMethod("mine", z.void(), async () => {
+    const user = await usersModule.submodule.getUser();
+    await usersModule.submodule
+      .getUser();
+    return user;
+  })
+  .buildSubmodule();
+`;
+    const result = run(source, files, "/app/server/apps.ts");
+    expect(result.output).toBe(`import { createModule, createCaller } from "meteor-rpc";
+import { usersModule } from "/server/users";
+
+export const apps = createModule("apps")
+  .addMethod("mine", z.void(), async () => {
+    const user = await createCaller(usersModule).getUser();
+    await createCaller(usersModule)
+      .getUser();
+    return user;
+  })
+  .buildSubmodule();
+`);
+    expect(summary(result.changes)).toEqual([
+      '1 §2 "grubba-rpc" → "meteor-rpc" (meteor-rpc\'s current name',
+      "6 §13 usersModule.submodule.getUser() → createCaller(usersModule).getUser() (1.x method objects aren't callable in 2.0)",
+      "7 §13 usersModule.submodule.getUser() → createCaller(usersModule).getUser() (1.x method objects aren't callable in 2.0)",
+    ]);
+  });
+
+  it("adds an import from meteor-rpc/server when the file has none, and reports what it can't follow", () => {
+    const source = `import { usersModule } from "/server/users";
+import { other } from "some-package";
+export const isAdmin = async () => (await usersModule.submodule.getUser()).isAdmin;
+export const unknown = () => other.submodule.run();
+`;
+    const result = run(source, files, "/app/server/git.ts");
+    expect(result.output).toBe(`import { usersModule } from "/server/users";
+import { other } from "some-package";
+import { createCaller } from "meteor-rpc/server";
+export const isAdmin = async () => (await createCaller(usersModule).getUser()).isAdmin;
+export const unknown = () => other.submodule.run();
+`);
+    expect(summary(result.manual)).toEqual(["4 §13 other.submodule.run()"]);
+  });
+});
+
+describe("test doubles", () => {
+  const files = { "/app/ui/api.ts": CLIENT };
+  const source = `import { render } from "./render";
+vi.mock("/ui/api", () => ({
+  api: { apps: { get: { useQuery: mocks.get, useMutation: vi.fn() } }, users: { me: { useQuery } } },
+}));
+expect(mocks.get).toHaveBeenCalledWith({ id: "1" }, { useQueryOptions: { refetchInterval: 5000 } });
+const options = { useQueryOptions: { retry: 1 } };
+`;
+
+  it("renames useQuery in mocks of the client and unwraps useQueryOptions in assertions", () => {
+    const result = run(source, files, "/app/ui/App.test.tsx");
+    expect(result.output).toBe(`import { render } from "./render";
+vi.mock("/ui/api", () => ({
+  api: { apps: { get: { useSuspenseQuery: mocks.get, useMutation: vi.fn() } }, users: { me: { useSuspenseQuery: useQuery } } },
+}));
+expect(mocks.get).toHaveBeenCalledWith({ id: "1" }, { refetchInterval: 5000 });
+const options = { useQueryOptions: { retry: 1 } };
+`);
+  });
+
+  it("keeps the mocks with --suspense-client, whose useQuery keeps suspending", () => {
+    const result = transform("/app/ui/App.test.tsx", source, ts, memoryProject(files), {
+      suspenseClient: true,
+    });
+    expect(result.output).toContain("get: { useQuery: mocks.get");
+    expect(result.output).toContain('toHaveBeenCalledWith({ id: "1" }, { refetchInterval: 5000 })');
+  });
+});
+
 describe("client tracking across files", () => {
   const ui = ["Absolute.tsx", "Barrel.tsx", "Namespace.tsx", "Relative.tsx"];
 
