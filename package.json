@@ -1,6 +1,6 @@
 {
   "name": "meteor-rpc",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "description": "End-to-end type-safe RPC (methods and publications) for Meteor, with optional React and TanStack Query hooks.",
   "license": "MIT",
   "author": "Gabriel Grubba",
