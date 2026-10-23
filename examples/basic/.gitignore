@@ -1,0 +1,5 @@
+node_modules/
+.meteor/local
+# The example installs meteor-rpc from a freshly packed tarball (see README.md), so a lockfile
+# would pin a checksum that changes on every build.
+package-lock.json
