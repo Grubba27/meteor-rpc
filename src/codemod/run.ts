@@ -111,11 +111,16 @@ export function migrateFiles(
   options: TransformOptions = {},
 ): FileResult[] {
   const project = createProject(ts, host);
+  const runOptions: TransformOptions = { ...options, runFiles: new Set(fileNames) };
   const results: FileResult[] = [];
   for (const fileName of fileNames) {
     const source = host.readFile(fileName);
     if (source === undefined) continue;
-    results.push({ fileName, source, result: transform(fileName, source, ts, project, options) });
+    results.push({
+      fileName,
+      source,
+      result: transform(fileName, source, ts, project, runOptions),
+    });
   }
   return results;
 }

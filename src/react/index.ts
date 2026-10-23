@@ -70,6 +70,10 @@ export function createClient<TRouter>(
 export function createClient<TRouter>(
   options?: ReactClientOptions & { suspense?: false | undefined },
 ): ReactClient<TRouter>;
+/** Options only known at runtime (`suspense` is a `boolean`): either client. */
+export function createClient<TRouter>(
+  options: ReactClientOptions,
+): ReactClient<TRouter> | SuspenseReactClient<TRouter>;
 export function createClient<TRouter>(
   options?: ReactClientOptions,
 ): ReactClient<TRouter> | SuspenseReactClient<TRouter> {

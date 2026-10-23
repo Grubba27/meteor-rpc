@@ -12,7 +12,12 @@ import { z } from "zod";
 import { z as z3 } from "zod3";
 import type { ClientCollection, SubscriptionHandle } from "../../src/client/index";
 import { createClient as createCoreClient } from "../../src/client/index";
-import { createClient } from "../../src/react/index";
+import {
+  createClient,
+  type ReactClient,
+  type ReactClientOptions,
+  type SuspenseReactClient,
+} from "../../src/react/index";
 import {
   createCaller,
   createModule,
@@ -188,13 +193,25 @@ describe("React client with { suspense: true }", () => {
     expectTypeOf(api.chat.rooms.usePublication().data).toEqualTypeOf<Room[]>();
   });
 
-  it("only switches with a literal true", () => {
+  it("picks the client from a literal option, and accepts options only known at runtime", () => {
     expectTypeOf(createClient<Server>({ suspense: false }).ping.useQuery()).toEqualTypeOf<
       UseQueryResult<"pong", Error>
     >();
     const suspense = Math.random() > 0.5;
-    // @ts-expect-error the client type can't depend on a runtime boolean
-    createClient<Server>({ suspense });
+    expectTypeOf(createClient<Server>({ suspense })).toEqualTypeOf<
+      ReactClient<Server> | SuspenseReactClient<Server>
+    >();
+    const options: ReactClientOptions = { suspense: true };
+    expectTypeOf(createClient<Server>(options)).toEqualTypeOf<
+      ReactClient<Server> | SuspenseReactClient<Server>
+    >();
+  });
+
+  it("keeps any from select", () => {
+    const anyItems = createClient<Server>().double.useQuery("1", {
+      select: (n): any => [n],
+    });
+    expectTypeOf(anyItems.data).toBeAny();
   });
 });
 

@@ -48,6 +48,38 @@ describe("createCaller", () => {
     await expect(caller.sub.echo(3)).resolves.toBe(3);
   });
 
+  it("accepts parts of a router: server.chat, chat.submodule and deeper", async () => {
+    const messages = createModule("messages")
+      .addMethod("count", z.void(), () => 3)
+      .buildSubmodule();
+    const chat = createModule("chat").addSubmodule(messages).buildSubmodule();
+    const server = createModule().addSubmodule(chat).build();
+
+    await expect(createCaller(server.chat).messages.count()).resolves.toBe(3);
+    await expect(createCaller(server.chat.messages).count()).resolves.toBe(3);
+    await expect(createCaller(chat.submodule).messages.count()).resolves.toBe(3);
+    await expect(createCaller(chat.submodule.messages).count()).resolves.toBe(3);
+  });
+
+  it("works from a publication resolver", async () => {
+    const counter = createModule("counter")
+      .addMethod("current", z.void(), (_input, { userId }) => `count for ${userId}`)
+      .buildSubmodule();
+    const seen: unknown[] = [];
+    const feed = createModule("feed")
+      .addPublication("latest", z.void(), async () => {
+        seen.push(await createCaller(counter).current());
+        return undefined;
+      })
+      .buildSubmodule();
+    const server = createModule().addSubmodule(counter).addSubmodule(feed).build();
+    fakeState.userId = "u2";
+
+    const handle = createClient<typeof server>().feed.latest.subscribe();
+    await vi.waitFor(() => expect(seen).toEqual(["count for u2"]));
+    handle.stop();
+  });
+
   it("can be created before the root module is built, and resolves the name when called", async () => {
     const tasks = createModule("tasks")
       .addMethod("count", z.void(), () => 2)
@@ -84,7 +116,7 @@ describe("createCaller", () => {
 
   it("only accepts built modules", () => {
     expect(() => createCaller({} as never)).toThrow(
-      /expects the result of buildSubmodule\(\) or build\(\)/,
+      /expects a module from buildSubmodule\(\) or build\(\)/,
     );
     expect(() => createCaller(createModule("x") as never)).toThrow(TypeError);
   });

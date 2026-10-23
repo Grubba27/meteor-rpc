@@ -61,6 +61,11 @@ export interface TransformOptions {
    * `createClient()` calls.
    */
   readonly suspenseClient?: boolean;
+  /**
+   * Every file of this run. With `suspenseClient`, a `useQuery` call whose client is created in a
+   * file outside the run is reported: that `createClient()` needs `{ suspense: true }` too.
+   */
+  readonly runFiles?: ReadonlySet<string>;
 }
 
 export interface TransformResult {
@@ -156,7 +161,7 @@ const REMOVED_EXPORTS: ReadonlyMap<string, string> = new Map([
   ],
   [
     "createSafeCaller",
-    "createSafeCaller was removed: create a client with createClient<Server>() and call api.name(args)",
+    "createSafeCaller was removed: create a client with createClient<Server>() and call api.name(args); in server code inside a module, use createCaller(module).name(args) from meteor-rpc/server",
   ],
   ["ReturnMethod", "the ReturnMethod type was removed: use MethodDefinition"],
   ["ReturnSubscription", "the ReturnSubscription type was removed: use PublicationDefinition"],
@@ -284,7 +289,7 @@ export function transform(
   const declarations = indexDeclarations(sf, ts);
   const clients: ClientBindings = sourceText.includes("useQuery")
     ? clientBindings(project, fileName, collectModuleFacts(sf, ts, imports))
-    : { locals: new Set(), namespaces: new Map() };
+    : { locals: new Set(), namespaces: new Map(), origins: new Map() };
   const migratedFunctions = new Set<TS.Node>();
 
   // --- imports ---------------------------------------------------------------------------
@@ -327,7 +332,8 @@ export function transform(
     (ts.isIdentifier(expr) && expr.text === "undefined") || ts.isVoidExpression(expr);
 
   /** Whether `expr` is `api.a.b` (at least one property) with `api` a meteor-rpc client. */
-  const isClientChain = (expr: TS.Expression): boolean => {
+  /** The identifier a client chain starts from (`api` in `api.x.y`), if it's a client. */
+  const clientRoot = (expr: TS.Expression): string | undefined => {
     const segments: string[] = [];
     let current = expr;
     for (;;) {
@@ -344,11 +350,14 @@ export function transform(
         break;
       }
     }
-    if (!ts.isIdentifier(current)) return false;
-    if (clients.locals.has(current.text)) return segments.length >= 1;
+    if (!ts.isIdentifier(current)) return undefined;
+    if (clients.locals.has(current.text)) return segments.length >= 1 ? current.text : undefined;
     const exported = clients.namespaces.get(current.text);
-    return exported !== undefined && segments.length >= 2 && exported.has(segments[0] ?? "");
+    return exported !== undefined && segments.length >= 2 && exported.has(segments[0] ?? "")
+      ? current.text
+      : undefined;
   };
+  const isClientChain = (expr: TS.Expression): boolean => clientRoot(expr) !== undefined;
 
   // --- §8: useQuery → useSuspenseQuery ---------------------------------------------------
 
@@ -367,6 +376,18 @@ export function transform(
     if (extra <= 0 || lines.length === 1) return lines.join("\n");
     const leading = new RegExp(`^[ \\t]{0,${extra}}`);
     return [lines[0], ...lines.slice(1).map((line) => line.replace(leading, ""))].join("\n");
+  };
+
+  /** --suspense-client: the client's createClient() must get the option too, so it must be in the run. */
+  const checkSuspenseClientInRun = (callee: TS.PropertyAccessExpression) => {
+    const root = clientRoot(callee.expression);
+    const origin = root === undefined ? undefined : clients.origins.get(root);
+    if (!origin || !options.runFiles || options.runFiles.has(origin)) return;
+    addManual(
+      callee.name,
+      `useQuery() keeps suspending only if the client is created with { suspense: true }: ${origin} isn't part of this run, so add the option to its createClient() call (or run the codemod on it too)`,
+      ANCHORS.react,
+    );
   };
 
   const migrateUseQuery = (call: TS.CallExpression, callee: TS.PropertyAccessExpression) => {
@@ -408,6 +429,7 @@ export function transform(
       }
     }
     if (suspenseClient) {
+      checkSuspenseClientInRun(callee);
       if (!second || options === undefined) return;
       replace(second.getStart(sf), second.getEnd(), options);
       addChange(
@@ -699,8 +721,9 @@ export function transform(
         replace(first.getStart(sf), first.getEnd(), "{ suspense: true }");
         return change();
       } else {
-        const at = first.getStart(sf) + 1;
-        replace(at, at, " suspense: true,");
+        // Last, so a spread before it (`{ ...options }`) can't turn it off.
+        const last = first.properties[first.properties.length - 1]!;
+        replace(last.getEnd(), last.getEnd(), ", suspense: true");
         return change();
       }
     }

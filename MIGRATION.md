@@ -290,7 +290,7 @@ The codemod reports these resolvers; pick a key name for each cursor.
 | `createQuery`, `createMutation` (aliases of `createMethod`) | `addMethod` |
 | `createPublication`, `createRealtimeQuery` | `addPublication` |
 | `createSharedRealtimeQuery` | `addSharedPublication` ([§10](#10-shared-publications-return-named-cursors)) |
-| `createSafeCaller<T>().call(name, args)` | `createClient<Server>()` then `api.name(args)` |
+| `createSafeCaller<T>().call(name, args)` | `createClient<Server>()` then `api.name(args)`; in server code inside a module, `createCaller(module).name(args)` ([§13](#13-calling-methods-from-the-server)) |
 | `method.addBeforeResolveHook` / `addAfterResolveHook` / `addErrorResolveHook` | `config.hooks` or `addMiddlewares` ([§5](#5-hooks-and-middlewares-take-one-context-object)) |
 | `method.setResolver(fn)` | Pass the resolver to `addMethod`. Server code doesn't reach the client as long as the client uses `import type`. |
 | `method.expect<T>()`, `method.returns<T>()` | Not needed: the result type is inferred from the resolver. Annotate the resolver's return type if you want to pin it. |
@@ -326,14 +326,16 @@ import { createCaller } from "meteor-rpc/server";
 
 // 1.x: await usersModule.submodule.getUser();
 const user = await createCaller(usersModule).getUser();
-// 1.x: await server.foo();
+// 1.x: await server.foo(); (outside the modules, for example in a job)
 await createCaller(server).foo();
 ```
 
 Calls run through `Meteor.callAsync`, with validation, middlewares and hooks, like in 1.x. Inside a
-method they keep its `userId`. Don't use `createClient<Server>()` inside a module that is part of
-`Server`: it makes the `Server` type circular (TS2456). Outside the module tree (scripts, cron
-jobs) `createClient<Server>()` from `meteor-rpc/client` works too.
+method they keep its `userId`. Inside a module, pass another module: neither the root router nor
+`createClient<Server>()` can be typed from inside the module tree, because `Server` would refer to
+itself (TS7022, TS2456). When modules import each other, create the caller inside the resolver.
+Outside the module tree (scripts, cron jobs) `createClient<Server>()` from `meteor-rpc/client`
+works too. More in [Server › Calling other modules from the server](./docs/server.md#calling-other-modules-from-the-server).
 
 ## Troubleshooting
 

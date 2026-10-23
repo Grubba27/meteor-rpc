@@ -69,7 +69,7 @@ Fix every `"manual"` item. The usual fixes:
 | `createMethod` / `createQuery` / `createMutation` removed | Move it into a module: `createModule().addMethod(name, schema, resolver, config)` (§11) |
 | `createPublication` / `createRealtimeQuery` removed | `addPublication`. On the client, use `api.x.usePublication(input)`, or `api.x.subscribe(input)` and `api.x.collection(input)` without React (§9) |
 | `createSharedRealtimeQuery` removed, or a shared publication returns an array | `addSharedPublication(name, schema, (input) => ({ rooms: Rooms.find(), users: Users.find() }))`. Pick a key per cursor, then update the client: `data.rooms`, `data.users` (§10) |
-| `createSafeCaller` removed | `const api = createClient<Server>(); await api.name(args)` |
+| `createSafeCaller` removed | `const api = createClient<Server>(); await api.name(args)`. In server code inside a module, `await createCaller(module).name(args)` (§13) |
 | `ReturnMethod`, `ReturnSubscription`, `Config`, `SubscriptionCallbacks` | `MethodDefinition`, `PublicationDefinition`, `MethodConfig` / `PublicationConfig`, `SubscribeCallbacks` |
 | `addBeforeResolveHook` / `addAfterResolveHook` / `addErrorResolveHook` | Move the hook into the method's `config.hooks`, or use `addMiddlewares`. Take one context: `({ raw, parsed, result, error })` (§5) |
 | `setResolver`, `expect<T>()`, `returns<T>()` | Pass the resolver to `addMethod`. Drop `expect` / `returns`; annotate the resolver's return type if needed (§11) |

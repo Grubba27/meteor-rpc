@@ -68,7 +68,11 @@ describe("--suspense-client (§8)", () => {
     const withOptions = runSuspense(
       'import { createClient } from "meteor-rpc/react";\nexport const api = createClient<Server>({ connection });\n',
     );
-    expect(withOptions.output).toContain("createClient<Server>({ suspense: true, connection })");
+    expect(withOptions.output).toContain("createClient<Server>({ connection, suspense: true })");
+    const spread = runSuspense(
+      'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ ...options });\n',
+    );
+    expect(spread.output).toContain("createClient<S>({ ...options, suspense: true })");
     const already =
       'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ suspense: true });\n';
     expect(runSuspense(already).output).toBe(already);
@@ -77,6 +81,26 @@ describe("--suspense-client (§8)", () => {
       'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ suspense: false });\n',
     );
     expect(summary(off.manual)).toEqual(["2 §8 pass { suspense"]);
+  });
+
+  it("reports useQuery calls whose client is created outside the run", () => {
+    const files: Record<string, string> = {
+      "/app/imports/api/client.ts": CLIENT,
+      "/app/imports/ui/A.tsx": `import { api } from "/imports/api/client";\napi.a.useQuery(1, { useQueryOptions: { retry: false } });\n`,
+    };
+    const host = {
+      fileExists: (fileName: string) => fileName in files,
+      readFile: (fileName: string) => files[fileName],
+      appRoot: () => "/app",
+    };
+    const [onlyUi] = migrateFiles(["/app/imports/ui/A.tsx"], ts, host, { suspenseClient: true });
+    expect(onlyUi?.result.output).toContain("api.a.useQuery(1, { retry: false })");
+    expect(summary(onlyUi?.result.manual ?? [])).toEqual([
+      "2 §8 useQuery() keeps suspending only if the client is created with { suspense",
+    ]);
+    const both = migrateFiles(Object.keys(files), ts, host, { suspenseClient: true });
+    expect(both.flatMap((file) => file.result.manual)).toEqual([]);
+    expect(both[0]?.result.output).toContain("createClient<Server>({ suspense: true })");
   });
 
   it("leaves the client without hooks alone", () => {

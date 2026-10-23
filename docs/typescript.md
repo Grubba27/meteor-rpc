@@ -51,7 +51,7 @@ From `meteor-rpc/server`:
 From `meteor-rpc/client` and `meteor-rpc/react`:
 
 - `Client`, `ReactClient`, `MethodCaller`, `ClientCollection`, `ValidationIssue`, `MethodQueryKey`, `QueryData`.
-- With `{ suspense: true }`: `SuspenseReactClient`, `SuspenseReactMethodClient`. The options type is `ReactClientOptions`.
+- With `{ suspense: true }`: `SuspenseReactClient`, `SuspenseReactMethodClient`. The options type is `ReactClientOptions`. Pass `suspense` as a literal `true` or `false` to get one client type; a `boolean` gives the union of both.
 
 Annotating a client explicitly:
 
@@ -69,8 +69,6 @@ readable and type-checking fast.
 ## Mistakes caught at compile time
 
 - Wrong or missing input: `api.users.get()` when the schema needs `{ id }`.
-- `createClient<Server>({ suspense })` with a `boolean` variable: the client type depends on the
-  option, so pass `true` or `false` literally.
 - Unknown methods and publications.
 - `build()` on a namespaced module, and `buildSubmodule()` on the root.
 - Duplicate, dotted or reserved names (`subscribe`, `useSomething`, `$something`, …).

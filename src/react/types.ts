@@ -28,9 +28,14 @@ export type MutationVariables<TInput> = undefined extends TInput ? TInput | void
 
 /**
  * `data` of a query hook: what `select` returns, or the method's result. `ReturnType<typeof
- * api.x.useQuery>` instantiates `TData` as `unknown`, so it reads as the method's result too.
+ * api.x.useQuery>` instantiates `TData` as `unknown`, so it reads as the method's result too
+ * (and so does a `select` typed as returning `unknown`). A `select` returning `any` stays `any`.
  */
-export type QueryData<TResult, TData> = unknown extends TData ? TResult : TData;
+export type QueryData<TResult, TData> = 0 extends 1 & TData
+  ? TData
+  : unknown extends TData
+    ? TResult
+    : TData;
 
 export type QueryOptionsFor<TResult, TData = TResult> = Omit<
   UseQueryOptions<TResult, Error, TData, MethodQueryKey>,

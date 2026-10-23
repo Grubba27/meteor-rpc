@@ -48,6 +48,8 @@ export interface ModuleState {
 const submoduleStates = new WeakMap<object, ModuleState>();
 const builtRouters = new WeakMap<ModuleState, RouterRecord>();
 const rootRouters = new WeakSet<object>();
+// The module of each nested router object (`server.chat`, `chat.submodule`), for `createCaller`.
+const routerStates = new WeakMap<object, ModuleState>();
 // Full dotted paths of each submodule, recorded when a root module containing it is built.
 const submodulePaths = new WeakMap<ModuleState, Set<string>>();
 
@@ -73,7 +75,7 @@ function recordSubmodulePaths(state: ModuleState, path: readonly string[]): void
 export function modulePathOf(target: unknown): () => readonly string[] {
   if (typeof target === "object" && target !== null) {
     if (rootRouters.has(target)) return () => [];
-    const state = submoduleStates.get(target);
+    const state = submoduleStates.get(target) ?? routerStates.get(target);
     if (state?.prefix !== undefined) {
       const prefix = state.prefix;
       return () => {
@@ -85,12 +87,12 @@ export function modulePathOf(target: unknown): () => readonly string[] {
           );
         }
         fail(
-          `module "${prefix}" is added in several places (${paths.join(", ")}): call createCaller() on the root router instead`,
+          `module "${prefix}" is added in several places (${paths.join(", ")}): pass createCaller() a module that contains it once, and call it through that module`,
         );
       };
     }
   }
-  fail("createCaller expects the result of buildSubmodule() or build()");
+  fail("createCaller expects a module from buildSubmodule() or build(), or a part of one");
 }
 
 function fail(message: string): never {
@@ -122,7 +124,9 @@ function toRouter(state: ModuleState): RouterRecord {
         ? toRouter(entry.state)
         : (Object.freeze({ type: entry.kind }) as Definition);
   }
-  return Object.freeze(router);
+  const frozen = Object.freeze(router);
+  if (state.prefix !== undefined) routerStates.set(frozen, state);
+  return frozen;
 }
 
 function builder(state: ModuleState): ModuleBuilder<any, any> {

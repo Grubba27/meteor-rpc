@@ -228,14 +228,22 @@ export const tasks = createModule("tasks")
 ```
 
 - **Same pipeline.** Calls go through `Meteor.callAsync`, so they're validated and run the
-  middlewares and hooks. Inside a method, they run with that method's `userId`.
-- **Any module.** Pass a `buildSubmodule()` result or the root router from `build()`. A caller
-  only has methods: subscribing needs a client connection.
+  middlewares and hooks. Inside a method or publication, they run with its `userId`. Elsewhere
+  (startup code, jobs) `userId` is `null`, so a middleware requiring a login rejects them.
+  Arguments are copied with EJSON, like any Meteor call, and `rateLimit` only applies to calls
+  from clients.
+- **What to pass.** A `buildSubmodule()` result, its `.submodule`, the root router from `build()`,
+  or a part of it (`createCaller(server.users)`). A caller only has methods: subscribing needs a
+  client connection.
 - **Full names.** A submodule learns its full name (`chat.messages.send`) when the root module is
-  built, so the name is resolved on each call. You can create the caller at import time.
-- **Not `createClient<Server>()`.** Inside a module that is part of `Server`, typing a client with
-  `Server` makes `Server` refer to itself (TS2456). `createCaller` is typed from the module you
-  pass.
+  built, so the name is resolved on each call. A submodule added in several places can't be
+  resolved: pass a module that contains it once.
+- **Inside a module, call other modules.** TypeScript can't infer a module whose type refers to
+  itself, so don't pass the module being defined, or the root router it's part of (TS7022). For
+  the same reason, `createClient<Server>()` doesn't work there (TS2456). If two modules call each
+  other and return the results, annotate one resolver's return type.
+- **Modules that import each other.** Create the caller inside the resolver, as above, not at the
+  top of the file: with circular imports the other module may not exist yet when the file runs.
 
 ## How a call runs
 

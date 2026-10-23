@@ -11,10 +11,13 @@ import { modulePathOf } from "./module.js";
  * ```
  *
  * Calls go through `Meteor.callAsync`, so they're validated and run the middlewares and hooks,
- * with the current method's `userId`. Pass a `buildSubmodule()` result or the root router.
+ * with the current method's `userId` (`null` outside a method or publication). Rate limits only
+ * apply to calls from clients.
  *
- * Typed from the module itself: inside a module that is part of `Server`,
- * `createClient<Server>()` would make the `Server` type circular.
+ * Pass a `buildSubmodule()` result, its `.submodule`, the root router, or a part of it
+ * (`server.users`). Inside a module, pass another module: a module whose type refers to itself
+ * (the root router, or the module being defined) can't be inferred, and neither can
+ * `createClient<Server>()` there.
  */
 export function createCaller<TName extends string, TRecord>(
   module: Submodule<TName, TRecord>,
