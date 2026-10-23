@@ -9,7 +9,7 @@ This package provides functions for building E2E type-safe RPCs.
 ## How to download it?
 
 ```bash
-meteor npm i meteor-rpc @tanstack/react-query zod
+meteor npm i meteor-rpc meteor-rpc-ts-plugin @tanstack/react-query zod
 ```
 
 install react query into your project, following their [quick start guide](https://tanstack.com/query/latest/docs/framework/react/quick-start)
@@ -388,3 +388,42 @@ server.name.addErrorResolveHook((err, raw, parsed) => {
 
 server = server.build();
 ```
+
+## Go to Definition (TypeScript Server Plugin)
+
+meteor-rpc ships a TypeScript language server plugin that redirects **Go to Definition** (`F12` / `Ctrl+B`) from a client call site directly to the matching `addMethod` / `createMethod` / `addPublication` call on the server — no code changes required.
+
+### Setup
+
+having installed `meteor-rpc-ts-plugin` and added it to `tsconfig.json` (see below), you should be able to jump from client calls to server definitions immediately. If not, try restarting the TS server (command palette → **"TypeScript: Restart TS Server"**).
+
+**1. Add the plugin to your `tsconfig.json`**
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "meteor-rpc-ts-plugin" }]
+  }
+}
+```
+
+**2. VS Code only — switch to workspace TypeScript**
+
+VS Code uses its own bundled TypeScript by default and ignores `tsconfig.json` plugins until you switch:
+
+1. Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`).
+2. Run **"TypeScript: Select TypeScript Version"**.
+3. Choose **"Use Workspace Version"**.
+
+This writes one line to `.vscode/settings.json` and is a one-time step. Other editors (Cursor, Neovim + tsserver, WebStorm) pick up `tsconfig.json` plugins automatically.
+
+### Result
+
+```typescript
+const app = createClient<Server>();
+
+app.bar("str");      // F12 on `bar`      → jumps to .addMethod("bar", ...)
+app.chat.createChat(); // F12 on `createChat` → jumps to .addMethod("createChat", ...)
+```
+
+Works with `addMethod`, `addPublication`, `addSharedPublication`, `createMethod`, `createQuery`, `createMutation`, `createPublication`, `createRealtimeQuery`, and `createSharedRealtimeQuery`.
