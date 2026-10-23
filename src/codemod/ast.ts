@@ -9,19 +9,25 @@ export type TypeScript = typeof TS;
 /** Import specifier of the 1.x Atmosphere package. The codemod rewrites it to "meteor-rpc". */
 export const ATMOSPHERE_SPECIFIER = "meteor/grubba:rpc";
 
+/** meteor-rpc 1.x's earlier npm name. The codemod rewrites it to "meteor-rpc". */
+export const OLD_NPM_SPECIFIER = "grubba-rpc";
+
+/** 1.x specifiers the codemod rewrites to "meteor-rpc". */
+export const LEGACY_SPECIFIERS: readonly string[] = [ATMOSPHERE_SPECIFIER, OLD_NPM_SPECIFIER];
+
 /** Entry points whose `createClient` has React hooks (1.x only had the root one). */
 export const REACT_CLIENT_SPECIFIERS: readonly string[] = [
   "meteor-rpc",
   "meteor-rpc/react",
-  ATMOSPHERE_SPECIFIER,
+  ...LEGACY_SPECIFIERS,
 ];
 
-/** Whether an import specifier names meteor-rpc: any entry point, or the 1.x Atmosphere package. */
+/** Whether an import specifier names meteor-rpc: any entry point, or a 1.x package name. */
 export function isRpcSpecifier(specifier: string): boolean {
   return (
     specifier === "meteor-rpc" ||
     specifier.startsWith("meteor-rpc/") ||
-    specifier === ATMOSPHERE_SPECIFIER
+    LEGACY_SPECIFIERS.includes(specifier)
   );
 }
 

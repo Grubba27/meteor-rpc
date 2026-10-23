@@ -59,6 +59,14 @@ runtime bugs of 1.x. Upgrade guide: [MIGRATION.md](./MIGRATION.md). There's a co
   always defined. The codemod's `--suspense-client` keeps 1.x `useQuery` calls for it.
 - `ReturnType<typeof api.x.useQuery>` (and `useSuspenseQuery`) has the method's result as `data`,
   as in 1.x, although the hooks are generic for `select`.
+- The codemod also:
+  - rewrites `grubba-rpc` (meteor-rpc's earlier npm name) like `meteor/grubba:rpc`, in imports and
+    test mocks;
+  - follows tsconfig `paths` aliases (`@/imports/api/client`) to find the client and modules;
+  - turns 1.x `someModule.submodule.method()` calls into `createCaller(someModule).method()`;
+  - renames `typeof api.x.useQuery` in types to `useSuspenseQuery`, like the calls;
+  - renames `useQuery` in `vi.mock` / `jest.mock` doubles of the client, and unwraps
+    `{ useQueryOptions }` in `toHaveBeenCalledWith` assertions.
 
 ### Fixed
 

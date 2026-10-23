@@ -1,9 +1,11 @@
 /// <reference types="node" />
 // Finds the meteor-rpc clients of an app across files. A client is a binding initialized with
 // `createClient<Server>()` from "meteor-rpc" (or "meteor-rpc/react"). It's usually exported from
-// one file and imported everywhere else, through a relative path or a Meteor absolute path such
-// as "/imports/api/client" (relative to the app root). Re-exports are followed. Other files are
-// read lazily through a ProjectHost, so the transform itself stays free of file system access.
+// one file and imported everywhere else, through a relative path, a Meteor absolute path such
+// as "/imports/api/client" (relative to the app root) or a tsconfig `paths` alias such as
+// "@/imports/api/client". Re-exports are followed. The same lookup finds 1.x submodules
+// (`createModule("x")...buildSubmodule()`), whose method calls become `createCaller`. Other files
+// are read lazily through a ProjectHost, so the transform itself stays free of file system access.
 import * as path from "node:path";
 import type * as TS from "typescript";
 import {
@@ -23,13 +25,26 @@ export interface ProjectHost {
   readFile(fileName: string): string | undefined;
   /** Directory that Meteor absolute imports ("/imports/...") are relative to. */
   appRoot(fileName: string): string | undefined;
+  /** The tsconfig `paths` that apply to `fileName`, if any. */
+  pathAliases?(fileName: string): PathAliases | undefined;
+}
+
+/** `compilerOptions.paths` of a tsconfig, with the directory its targets are relative to. */
+export interface PathAliases {
+  readonly baseDir: string;
+  readonly paths: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface Project {
-  /** Resolves a relative or Meteor absolute import to a file name. Packages resolve to undefined. */
+  /**
+   * Resolves a relative, Meteor absolute or tsconfig `paths` import to a file name. Packages
+   * resolve to undefined.
+   */
   resolve(fromFile: string, specifier: string): string | undefined;
   /** Export names of `fileName` that are meteor-rpc clients ("default" for a default export). */
   clientExports(fileName: string): ReadonlySet<string>;
+  /** Export names of `fileName` that are submodules, `createModule("x")...buildSubmodule()`. */
+  submoduleExports(fileName: string): ReadonlySet<string>;
 }
 
 /** An imported name: `import { imported as local } from "specifier"`. */
@@ -49,9 +64,11 @@ export interface ReExport {
 export interface ModuleFacts {
   /** Local names bound to `createClient()` (anywhere in the file). */
   readonly clientLocals: ReadonlySet<string>;
+  /** Local names bound to a `createModule("x")...buildSubmodule()` chain. */
+  readonly submoduleLocals: ReadonlySet<string>;
   /** Exported name -> local name. */
   readonly exports: ReadonlyMap<string, string>;
-  /** Local name -> imported name, for value imports. */
+  /** Local name -> imported name, including type-only imports. */
   readonly imports: ReadonlyMap<string, ImportedName>;
   /** `import * as local from "specifier"`: local name -> specifier. */
   readonly namespaceImports: ReadonlyMap<string, string>;
@@ -81,6 +98,7 @@ export function collectModuleFacts(
   rpcImports: RpcImports = scanRpcImports(sf, ts),
 ): ModuleFacts {
   const clientLocals = new Set<string>();
+  const submoduleLocals = new Set<string>();
   const exports = new Map<string, string>();
   const imports = new Map<string, ImportedName>();
   const namespaceImports = new Map<string, string>();
@@ -96,13 +114,31 @@ export function collectModuleFacts(
     );
   };
 
+  /** `createModule("x")…buildSubmodule()`: a call of `buildSubmodule` on a createModule chain. */
+  const isSubmoduleCreation = (expr: TS.Expression | undefined): boolean => {
+    if (!expr) return false;
+    const value = unwrap(expr, ts);
+    if (!ts.isCallExpression(value) || !ts.isPropertyAccessExpression(value.expression))
+      return false;
+    if (value.expression.name.text !== "buildSubmodule") return false;
+    let current: TS.Expression = value.expression.expression;
+    for (;;) {
+      current = unwrap(current, ts);
+      if (ts.isCallExpression(current)) {
+        if (refersToRpcExport(current.expression, "createModule", rpcImports, ts)) return true;
+        current = current.expression;
+      } else if (ts.isPropertyAccessExpression(current)) {
+        current = current.expression;
+      } else {
+        return false;
+      }
+    }
+  };
+
   const visit = (node: TS.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      isClientCreation(node.initializer)
-    ) {
-      clientLocals.add(node.name.text);
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      if (isClientCreation(node.initializer)) clientLocals.add(node.name.text);
+      else if (isSubmoduleCreation(node.initializer)) submoduleLocals.add(node.name.text);
     }
     ts.forEachChild(node, visit);
   };
@@ -112,7 +148,8 @@ export function collectModuleFacts(
     if (ts.isImportDeclaration(statement)) {
       const clause = statement.importClause;
       const literal = statement.moduleSpecifier;
-      if (!clause || clause.isTypeOnly || !ts.isStringLiteralLike(literal)) continue;
+      // Type-only imports count too: `import type { api }` feeds `typeof api.x.useQuery`.
+      if (!clause || !ts.isStringLiteralLike(literal)) continue;
       const specifier = literal.text;
       if (clause.name) imports.set(clause.name.text, { specifier, imported: "default" });
       const bindings = clause.namedBindings;
@@ -120,7 +157,6 @@ export function collectModuleFacts(
         namespaceImports.set(bindings.name.text, specifier);
       } else if (bindings) {
         for (const element of bindings.elements) {
-          if (element.isTypeOnly) continue;
           imports.set(element.name.text, {
             specifier,
             imported: (element.propertyName ?? element.name).text,
@@ -167,24 +203,63 @@ export function collectModuleFacts(
       }
     }
   }
-  return { clientLocals, exports, imports, namespaceImports, reexports, starExports };
+  return {
+    clientLocals,
+    submoduleLocals,
+    exports,
+    imports,
+    namespaceImports,
+    reexports,
+    starExports,
+  };
 }
 
 export function createProject(ts: TypeScript, host: ProjectHost): Project {
-  const cache = new Map<string, ReadonlySet<string>>();
-  const pending = new Set<string>();
-
   const resolve = (fromFile: string, specifier: string): string | undefined => {
-    let base: string;
     if (specifier === "." || specifier === ".." || /^\.\.?\//.test(specifier)) {
-      base = path.resolve(path.dirname(fromFile), specifier);
-    } else if (specifier.startsWith("/")) {
-      const root = host.appRoot(fromFile);
-      if (root === undefined) return undefined;
-      base = path.join(root, specifier);
-    } else {
-      return undefined;
+      return findFile(path.resolve(path.dirname(fromFile), specifier));
     }
+    if (specifier.startsWith("/")) {
+      const root = host.appRoot(fromFile);
+      return root === undefined ? undefined : findFile(path.join(root, specifier));
+    }
+    const aliases = host.pathAliases?.(fromFile);
+    return aliases ? resolveAlias(aliases, specifier) : undefined;
+  };
+
+  /** Like TypeScript: the pattern with the longest prefix before its `*` wins. */
+  const resolveAlias = (aliases: PathAliases, specifier: string): string | undefined => {
+    let best: { targets: readonly string[]; captured: string; prefix: number } | undefined;
+    for (const [pattern, targets] of Object.entries(aliases.paths)) {
+      const star = pattern.indexOf("*");
+      if (star === -1) {
+        if (pattern === specifier) return firstTarget(aliases, targets, "");
+        continue;
+      }
+      const prefix = pattern.slice(0, star);
+      const suffix = pattern.slice(star + 1);
+      if (
+        specifier.length >= prefix.length + suffix.length &&
+        specifier.startsWith(prefix) &&
+        specifier.endsWith(suffix) &&
+        (!best || prefix.length > best.prefix)
+      ) {
+        const captured = specifier.slice(prefix.length, specifier.length - suffix.length);
+        best = { targets, captured, prefix: prefix.length };
+      }
+    }
+    return best ? firstTarget(aliases, best.targets, best.captured) : undefined;
+  };
+
+  const firstTarget = (aliases: PathAliases, targets: readonly string[], captured: string) => {
+    for (const target of targets) {
+      const found = findFile(path.resolve(aliases.baseDir, target.replace("*", captured)));
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  const findFile = (base: string): string | undefined => {
     const candidates = [base];
     // TypeScript lets "./client.js" point at client.ts.
     const jsExtension = /\.([cm]?)js(x?)$/.exec(base);
@@ -198,46 +273,63 @@ export function createProject(ts: TypeScript, host: ProjectHost): Project {
     return candidates.find((candidate) => host.fileExists(candidate));
   };
 
-  const exportedClients = (fileName: string, facts: ModuleFacts): Set<string> => {
-    const result = new Set<string>();
-    const isClientImport = (imported: ImportedName) => {
-      const target = resolve(fileName, imported.specifier);
-      return target !== undefined && clientExports(target).has(imported.imported);
-    };
-    for (const [exported, local] of facts.exports) {
-      const imported = facts.imports.get(local);
-      if (facts.clientLocals.has(local) || (imported && isClientImport(imported))) {
-        result.add(exported);
+  const factsCache = new Map<string, ModuleFacts | undefined>();
+  const factsOf = (fileName: string): ModuleFacts | undefined => {
+    if (!factsCache.has(fileName)) {
+      const text = host.readFile(fileName);
+      factsCache.set(
+        fileName,
+        text?.includes("export")
+          ? collectModuleFacts(parseFile(fileName, text, ts), ts)
+          : undefined,
+      );
+    }
+    return factsCache.get(fileName);
+  };
+
+  /** Export names of a file whose local is of one kind (`localsOf`), following re-exports. */
+  const exportFinder = (localsOf: (facts: ModuleFacts) => ReadonlySet<string>) => {
+    const cache = new Map<string, ReadonlySet<string>>();
+    const pending = new Set<string>();
+    const find = (fileName: string): ReadonlySet<string> => {
+      const cached = cache.get(fileName);
+      if (cached) return cached;
+      if (pending.has(fileName)) return EMPTY; // import cycle
+      pending.add(fileName);
+      const facts = factsOf(fileName);
+      const result = new Set<string>();
+      if (facts) {
+        const isImportOfKind = (imported: ImportedName) => {
+          const target = resolve(fileName, imported.specifier);
+          return target !== undefined && find(target).has(imported.imported);
+        };
+        for (const [exported, local] of facts.exports) {
+          const imported = facts.imports.get(local);
+          if (localsOf(facts).has(local) || (imported && isImportOfKind(imported))) {
+            result.add(exported);
+          }
+        }
+        for (const reexport of facts.reexports) {
+          if (isImportOfKind(reexport)) result.add(reexport.exported);
+        }
+        for (const specifier of facts.starExports) {
+          const target = resolve(fileName, specifier);
+          if (!target) continue;
+          for (const name of find(target)) if (name !== "default") result.add(name);
+        }
       }
-    }
-    for (const reexport of facts.reexports) {
-      if (isClientImport(reexport)) result.add(reexport.exported);
-    }
-    for (const specifier of facts.starExports) {
-      const target = resolve(fileName, specifier);
-      if (!target) continue;
-      for (const name of clientExports(target)) if (name !== "default") result.add(name);
-    }
-    return result;
+      pending.delete(fileName);
+      cache.set(fileName, result);
+      return result;
+    };
+    return find;
   };
 
-  const clientExports = (fileName: string): ReadonlySet<string> => {
-    const cached = cache.get(fileName);
-    if (cached) return cached;
-    if (pending.has(fileName)) return EMPTY; // import cycle
-    pending.add(fileName);
-    let result = EMPTY;
-    const text = host.readFile(fileName);
-    if (text?.includes("export")) {
-      const sf = parseFile(fileName, text, ts);
-      result = exportedClients(fileName, collectModuleFacts(sf, ts));
-    }
-    pending.delete(fileName);
-    cache.set(fileName, result);
-    return result;
+  return {
+    resolve,
+    clientExports: exportFinder((facts) => facts.clientLocals),
+    submoduleExports: exportFinder((facts) => facts.submoduleLocals),
   };
-
-  return { resolve, clientExports };
 }
 
 /** Which identifiers of a file are meteor-rpc clients, created there or imported. */

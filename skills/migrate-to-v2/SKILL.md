@@ -12,11 +12,11 @@ you fix an item. Don't guess the 2.0 API.
 
 ## 1. Detect
 
-- Installed version: `meteor npm ls meteor-rpc` and `package.json`. Atmosphere package:
-  `grep -n "grubba:rpc" .meteor/packages`.
+- Installed version: `meteor npm ls meteor-rpc grubba-rpc` and `package.json`. `grubba-rpc` is
+  meteor-rpc 1.x under its earlier npm name. Atmosphere package: `grep -n "grubba:rpc" .meteor/packages`.
 - Meteor version: `.meteor/release`. 2.0 needs Meteor 3.0+. If the app is on 2.x, stop and tell
   the user.
-- Usage: `grep -rn -e "meteor-rpc" -e "grubba:rpc" --exclude-dir=node_modules --exclude-dir=.meteor .`
+- Usage: `grep -rn -e "meteor-rpc" -e "grubba-rpc" -e "grubba:rpc" --exclude-dir=node_modules --exclude-dir=.meteor .`
   Note the client file (`createClient<Server>()`), the root module (`createModule()…build()`)
   and the submodules.
 - Type provider: `@types/meteor` in package.json, `zodern:types` in `.meteor/packages`, or
@@ -31,11 +31,13 @@ you fix an item. Don't guess the 2.0 API.
 meteor npm install meteor-rpc@2 @tanstack/react-query
 meteor npm install zod@latest            # only if zod < 3.24
 meteor remove grubba:rpc                 # only if it's in .meteor/packages
+meteor npm uninstall grubba-rpc          # only if it's in package.json
 meteor npm ls react @tanstack/react-query  # must show one copy of each
 ```
 
 Remove workarounds added for 1.x type errors (§3): `paths` entries for meteor-rpc,
-`@ts-ignore` / `@ts-expect-error` on its imports, and `skipLibCheck` if it was turned on only for
+`@ts-ignore` / `@ts-expect-error` on its imports, scripts that patch `node_modules/meteor-rpc`
+(or `node_modules/grubba-rpc`) before running `tsc`, and `skipLibCheck` if it was turned on only for
 meteor-rpc. Ask the user before changing `skipLibCheck` if you can't tell why it's on.
 
 ## 3. Run the codemod
@@ -52,9 +54,16 @@ npx -y -p typescript@5.9 -p meteor-rpc@2 meteor-rpc-migrate --json imports clien
 - Run `--write` only once. A second run would rename `useQuery` calls you wrote for 2.0 into
   `useSuspenseQuery`.
 - If it can't load TypeScript, use the exact npx command above. TypeScript 7 has no JavaScript API.
-- It changes: `api.x.useQuery(input, { useQueryOptions: o })` → `api.x.useSuspenseQuery(input, o)`,
-  `(raw, parsed) => …` hooks and middlewares → `({ raw, parsed }) => …`, and
-  `"meteor/grubba:rpc"` imports → `"meteor-rpc"`. Review the result with `git diff`.
+- It changes:
+  - `api.x.useQuery(input, { useQueryOptions: o })` → `api.x.useSuspenseQuery(input, o)`, and the
+    client's test doubles (`useQuery` keys in `vi.mock` factories, `{ useQueryOptions }` in
+    `toHaveBeenCalledWith`);
+  - `(raw, parsed) => …` hooks and middlewares → `({ raw, parsed }) => …`;
+  - `someModule.submodule.method()` → `createCaller(someModule).method()`;
+  - `"meteor/grubba:rpc"` and `"grubba-rpc"` imports and mocks → `"meteor-rpc"`.
+
+  It follows relative, Meteor absolute (`/imports/...`) and tsconfig `paths` imports. Review the
+  result with `git diff`.
 - **Keeping `useQuery` (fewer changes).** Add `--suspense-client` to both runs: it keeps the
   `useQuery` calls (only unwrapping `{ useQueryOptions }`) and creates the React client with
   `{ suspense: true }`, so they keep suspending like 1.x. Ask the user if you can't tell which they
@@ -86,9 +95,10 @@ The codemod can't see these. Search for them yourself:
   the root runs first. Check any middleware that depends on another one having run.
 - **Publications now run middlewares, hooks and `rateLimit` (§6).** A middleware written for
   methods may need `if (ctx.type === "method")`.
-- **Calling methods on the server (§13).** `server.foo()` and `someModule.submodule.foo()` (1.x
-  method objects) no longer work. Use `createCaller(someModule).foo()` from `meteor-rpc/server`,
-  not `createClient<Server>()`, which makes `Server` circular inside its own modules.
+- **Calling methods on the server (§13).** `server.foo()` (1.x method objects on the root router)
+  no longer works, and nor do `someModule.submodule.foo()` calls the codemod couldn't follow (it
+  reports those). Use `createCaller(module).foo()` from `meteor-rpc/server`, not
+  `createClient<Server>()`, which makes `Server` circular inside its own modules.
 - **Client collections (§9).** Code that opened `new Mongo.Collection("<publication name>")` on
   the client to read a publication's documents must use the `collection` returned by
   `usePublication`, or `api.x.collection(input)` (`api.x.collections(input)` for shared

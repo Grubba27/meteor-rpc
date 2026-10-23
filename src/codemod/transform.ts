@@ -16,6 +16,7 @@ import {
   findProperty,
   firstSyntaxError,
   indexDeclarations,
+  LEGACY_SPECIFIERS,
   parseFile,
   positionOf,
   propertyNameText,
@@ -85,7 +86,8 @@ export type AnchorName =
   | "react"
   | "shared"
   | "removed"
-  | "build";
+  | "build"
+  | "server";
 
 /** Sections of MIGRATION.md the findings point to. */
 export const ANCHORS: Readonly<Record<AnchorName, string>> = {
@@ -97,10 +99,11 @@ export const ANCHORS: Readonly<Record<AnchorName, string>> = {
   shared: "MIGRATION.md#10-shared-publications-return-named-cursors",
   removed: "MIGRATION.md#11-removed-exports",
   build: "MIGRATION.md#12-build-and-buildsubmodule",
+  server: "MIGRATION.md#13-calling-methods-from-the-server",
 };
 
 // Files without any of these can't need a change; they aren't parsed.
-const QUICK_CHECK = /meteor-rpc|grubba:rpc|useQuery|__isError__/;
+const QUICK_CHECK = /meteor-rpc|grubba:rpc|grubba-rpc|useQuery|__isError__|\.submodule\b/;
 
 type HookKind = "middleware" | "onBeforeResolve" | "onAfterResolve" | "onErrorResolve";
 
@@ -287,21 +290,29 @@ export function transform(
     imports.namespaces.size > 0 ||
     [...imports.named.values()].some((binding) => binding.imported === "createModule");
   const declarations = indexDeclarations(sf, ts);
+  const facts = collectModuleFacts(sf, ts, imports);
   const clients: ClientBindings = sourceText.includes("useQuery")
-    ? clientBindings(project, fileName, collectModuleFacts(sf, ts, imports))
+    ? clientBindings(project, fileName, facts)
     : { locals: new Set(), namespaces: new Map(), origins: new Map() };
+  // `{ useQueryOptions: … }` literals already unwrapped by migrateUseQuery.
+  const handledOptions = new Set<TS.Node>();
   const migratedFunctions = new Set<TS.Node>();
 
   // --- imports ---------------------------------------------------------------------------
 
-  for (const literal of imports.specifiers) {
-    if (literal.text !== ATMOSPHERE_SPECIFIER) continue;
+  /** "meteor/grubba:rpc" and "grubba-rpc" → "meteor-rpc", in imports and test mocks. */
+  const renameLegacySpecifier = (literal: TS.StringLiteralLike) => {
     replace(literal.getStart(sf) + 1, literal.getEnd() - 1, "meteor-rpc");
     addChange(
       literal,
-      `"${ATMOSPHERE_SPECIFIER}" → "meteor-rpc" (2.0 is npm only: run \`meteor remove grubba:rpc\`)`,
+      literal.text === ATMOSPHERE_SPECIFIER
+        ? `"${ATMOSPHERE_SPECIFIER}" → "meteor-rpc" (2.0 is npm only: run \`meteor remove grubba:rpc\`)`
+        : `"${literal.text}" → "meteor-rpc" (meteor-rpc's current name: run \`meteor npm uninstall ${literal.text}\`)`,
       ANCHORS.install,
     );
+  };
+  for (const literal of imports.specifiers) {
+    if (LEGACY_SPECIFIERS.includes(literal.text)) renameLegacySpecifier(literal);
   }
   for (const binding of imports.bindings) {
     const message = REMOVED_EXPORTS.get(binding.imported);
@@ -358,6 +369,19 @@ export function transform(
       : undefined;
   };
   const isClientChain = (expr: TS.Expression): boolean => clientRoot(expr) !== undefined;
+
+  /** `api.x` in a type query such as `typeof api.x.useQuery`: whether it starts at a client. */
+  const isClientEntity = (name: TS.EntityName): boolean => {
+    const segments: string[] = [];
+    let current: TS.EntityName = name;
+    while (ts.isQualifiedName(current)) {
+      segments.unshift(current.right.text);
+      current = current.left;
+    }
+    if (clients.locals.has(current.text)) return segments.length >= 1;
+    const exported = clients.namespaces.get(current.text);
+    return exported !== undefined && segments.length >= 2 && exported.has(segments[0] ?? "");
+  };
 
   // --- §8: useQuery → useSuspenseQuery ---------------------------------------------------
 
@@ -428,6 +452,7 @@ export function transform(
         return keepManual("gets its options from an expression the codemod can't follow");
       }
     }
+    if (second && options !== undefined) handledOptions.add(second);
     if (suspenseClient) {
       checkSuspenseClientInRun(callee);
       if (!second || options === undefined) return;
@@ -734,6 +759,169 @@ export function transform(
     );
   };
 
+  // --- 1.x method objects: module.submodule.method() → createCaller(module).method() (§13) -----
+
+  let callerImported = false;
+  /** Adds `createCaller` to an existing meteor-rpc import, or a new import from meteor-rpc/server. */
+  const importCreateCaller = () => {
+    if (callerImported) return;
+    callerImported = true;
+    if (imports.named.get("createCaller")?.imported === "createCaller") return;
+    for (const statement of sf.statements) {
+      if (!ts.isImportDeclaration(statement)) continue;
+      const literal = statement.moduleSpecifier;
+      const clause = statement.importClause;
+      const named = clause?.namedBindings;
+      if (
+        !ts.isStringLiteralLike(literal) ||
+        !["meteor-rpc", "meteor-rpc/server", ...LEGACY_SPECIFIERS].includes(literal.text) ||
+        clause?.isTypeOnly ||
+        !named ||
+        !ts.isNamedImports(named) ||
+        named.elements.length === 0
+      ) {
+        continue;
+      }
+      const last = named.elements[named.elements.length - 1]!;
+      replace(last.getEnd(), last.getEnd(), ", createCaller");
+      return;
+    }
+    const lastImport = [...sf.statements]
+      .reverse()
+      .find((statement) => ts.isImportDeclaration(statement));
+    const declaration = 'import { createCaller } from "meteor-rpc/server";';
+    if (lastImport) replace(lastImport.getEnd(), lastImport.getEnd(), `\n${declaration}`);
+    else replace(0, 0, `${declaration}\n`);
+  };
+
+  /** Whether `name` is a `buildSubmodule()` result, declared in this file or imported. */
+  const isSubmodule = (name: string): boolean => {
+    if (facts.submoduleLocals.has(name)) return true;
+    const imported = facts.imports.get(name);
+    if (!imported) return false;
+    const target = project.resolve(fileName, imported.specifier);
+    return target !== undefined && project.submoduleExports(target).has(imported.imported);
+  };
+
+  const migrateSubmoduleCall = (callee: TS.PropertyAccessExpression) => {
+    const holder = callee.expression;
+    if (!ts.isPropertyAccessExpression(holder) || holder.name.text !== "submodule") return;
+    const module = unwrap(holder.expression, ts);
+    if (!ts.isIdentifier(module)) return;
+    const label = `${module.text}.submodule.${callee.name.text}()`;
+    if (!isSubmodule(module.text)) {
+      if (usesRpc || facts.imports.has(module.text)) {
+        addManual(
+          holder.name,
+          `${label}: if ${module.text} is a module from buildSubmodule(), 1.x method objects aren't callable in 2.0; call createCaller(${module.text}).${callee.name.text}() (meteor-rpc/server)`,
+          ANCHORS.server,
+        );
+      }
+      return;
+    }
+    replace(holder.getStart(sf), holder.getEnd(), `createCaller(${module.text})`);
+    importCreateCaller();
+    addChange(
+      holder.name,
+      `${label} → createCaller(${module.text}).${callee.name.text}() (1.x method objects aren't callable in 2.0)`,
+      ANCHORS.server,
+    );
+  };
+
+  // --- test doubles ---------------------------------------------------------------------------
+
+  const MOCKERS = new Set([
+    "mock",
+    "doMock",
+    "unmock",
+    "importActual",
+    "importMock",
+    "requireActual",
+    "requireMock",
+  ]);
+
+  /** `vi.mock("x", …)` / `jest.mock("x", …)`: the specifier literal, if it is one. */
+  const mockedSpecifier = (call: TS.CallExpression): TS.StringLiteralLike | undefined => {
+    const callee = call.expression;
+    const [first] = call.arguments;
+    return ts.isPropertyAccessExpression(callee) &&
+      ts.isIdentifier(callee.expression) &&
+      (callee.expression.text === "vi" || callee.expression.text === "jest") &&
+      MOCKERS.has(callee.name.text) &&
+      first &&
+      ts.isStringLiteralLike(first)
+      ? first
+      : undefined;
+  };
+
+  /**
+   * A mock of the module exporting the client: its `useQuery` keys become `useSuspenseQuery`,
+   * like the calls of the code under test (not with --suspense-client, which keeps useQuery).
+   */
+  const migrateClientMock = (specifier: TS.StringLiteralLike, factory: TS.Node) => {
+    const target = project.resolve(fileName, specifier.text);
+    if (!target || project.clientExports(target).size === 0) return;
+    const visitFactory = (node: TS.Node): void => {
+      if (
+        (ts.isPropertyAssignment(node) || ts.isMethodDeclaration(node)) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === "useQuery"
+      ) {
+        replace(node.name.getStart(sf), node.name.getEnd(), "useSuspenseQuery");
+        addChange(
+          node.name,
+          `mock of "${specifier.text}": useQuery → useSuspenseQuery, like the calls it stands in for`,
+          ANCHORS.react,
+        );
+      } else if (ts.isShorthandPropertyAssignment(node) && node.name.text === "useQuery") {
+        replace(node.name.getStart(sf), node.name.getEnd(), "useSuspenseQuery: useQuery");
+        addChange(
+          node.name,
+          `mock of "${specifier.text}": useQuery → useSuspenseQuery, like the calls it stands in for`,
+          ANCHORS.react,
+        );
+      }
+      ts.forEachChild(node, visitFactory);
+    };
+    visitFactory(factory);
+  };
+
+  // Test matchers asserting the arguments of a mocked call.
+  const CALL_MATCHERS =
+    /^(toHaveBeen(Nth|Last)?CalledWith|toBeCalledWith|lastCalledWith|nthCalledWith)$/;
+
+  /**
+   * `expect(mock).toHaveBeenCalledWith(input, { useQueryOptions: o })` → `…(input, o)`: the
+   * assertion follows the migrated call. Other literals are left alone; they may feed anything.
+   */
+  const migrateOptionsLiteral = (node: TS.ObjectLiteralExpression) => {
+    if (handledOptions.has(node) || node.properties.length !== 1) return;
+    const call = node.parent;
+    if (
+      !ts.isCallExpression(call) ||
+      !call.arguments.includes(node) ||
+      !ts.isPropertyAccessExpression(call.expression) ||
+      !CALL_MATCHERS.test(call.expression.name.text)
+    ) {
+      return;
+    }
+    const [only] = node.properties;
+    if (!only) return;
+    let replacement: string | undefined;
+    if (ts.isPropertyAssignment(only) && propertyNameText(only.name, ts) === "useQueryOptions") {
+      replacement = dedented(only.initializer, node);
+    } else if (ts.isShorthandPropertyAssignment(only) && only.name.text === "useQueryOptions") {
+      replacement = "useQueryOptions";
+    }
+    if (replacement === undefined) return;
+    replace(node.getStart(sf), node.getEnd(), replacement);
+    addChange(
+      node,
+      "{ useQueryOptions: o } → o in this assertion: 2.0 hooks take TanStack Query options directly",
+      ANCHORS.react,
+    );
+  };
+
   // --- walk --------------------------------------------------------------------------------
 
   const visitCall = (call: TS.CallExpression) => {
@@ -744,7 +932,15 @@ export function transform(
     ) {
       return addSuspenseOption(call);
     }
+    const mocked = mockedSpecifier(call);
+    if (mocked) {
+      if (LEGACY_SPECIFIERS.includes(mocked.text)) renameLegacySpecifier(mocked);
+      const factory = call.arguments[1];
+      if (factory && !suspenseClient) migrateClientMock(mocked, factory);
+      return;
+    }
     if (!ts.isPropertyAccessExpression(callee)) return;
+    migrateSubmoduleCall(callee);
     const method = callee.name.text;
     if (method === "useQuery") {
       if (isClientChain(callee.expression)) migrateUseQuery(call, callee);
@@ -796,6 +992,22 @@ export function transform(
       }
     } else if (ts.isQualifiedName(node)) {
       visitQualifiedReference(node.left, node.right.text, node);
+      // `ReturnType<typeof api.x.useQuery>`: a 1.x useQuery was a suspense query.
+      if (
+        !suspenseClient &&
+        node.right.text === "useQuery" &&
+        ts.isTypeQueryNode(node.parent) &&
+        isClientEntity(node.left)
+      ) {
+        replace(node.right.getStart(sf), node.right.getEnd(), "useSuspenseQuery");
+        addChange(
+          node.right,
+          `typeof ${shorten(text(node.left))}.useQuery → useSuspenseQuery (1.x useQuery suspended, so its data was always defined)`,
+          ANCHORS.react,
+        );
+      }
+    } else if (ts.isObjectLiteralExpression(node)) {
+      migrateOptionsLiteral(node);
     } else if (
       usesRpc &&
       (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&

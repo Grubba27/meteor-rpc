@@ -52,12 +52,17 @@ exit with code 1 while anything is left to change or review.
 
 It handles:
 
-- `api.x.useQuery(input, { useQueryOptions: options })` → `api.x.useSuspenseQuery(input, options)` ([§8](#8-react-usequery-vs-usesuspensequery))
+- `api.x.useQuery(input, { useQueryOptions: options })` → `api.x.useSuspenseQuery(input, options)`, and `typeof api.x.useQuery` in types ([§8](#8-react-usequery-vs-usesuspensequery))
+- Test doubles of the client: `useQuery` keys in `vi.mock` / `jest.mock` factories → `useSuspenseQuery`, and `{ useQueryOptions: o }` → `o` in `toHaveBeenCalledWith` assertions
 - `(raw, parsed) => …` hooks and middlewares → `({ raw, parsed }) => …` ([§5](#5-hooks-and-middlewares-take-one-context-object))
-- `"meteor/grubba:rpc"` imports → `"meteor-rpc"` ([§2](#2-install))
+- `someModule.submodule.method()` → `createCaller(someModule).method()` ([§13](#13-calling-methods-from-the-server))
+- `"meteor/grubba:rpc"` and `"grubba-rpc"` imports (and mocks) → `"meteor-rpc"` ([§2](#2-install))
 
-With `--suspense-client` it keeps your `useQuery` calls instead: it only unwraps
-`{ useQueryOptions }`, and creates the React client with `{ suspense: true }` so they keep
+It follows the client and modules across files: relative imports, Meteor absolute imports
+(`/imports/...`), and the `paths` aliases of your `tsconfig.json` (`@/imports/...`).
+
+With `--suspense-client` it keeps your `useQuery` calls and their test doubles instead: it only
+unwraps `{ useQueryOptions }`, and creates the React client with `{ suspense: true }` so they keep
 suspending ([§8](#8-react-usequery-vs-usesuspensequery)).
 
 > **Run `--write` once, on 1.x code.** The codemod can't tell a 1.x `useQuery` (which suspended)
@@ -100,7 +105,8 @@ Using zod older than 3.24? Upgrade it (`meteor npm install zod@latest`). Older v
 implement Standard Schema.
 
 If you used the Atmosphere package `grubba:rpc`, remove it (`meteor remove grubba:rpc`). 2.0 is
-npm only.
+npm only. If you used the npm package `grubba-rpc` (meteor-rpc's earlier name), uninstall it
+(`meteor npm uninstall grubba-rpc`): the codemod rewrites its imports to `meteor-rpc`.
 
 ### 3. TypeScript setup
 
@@ -320,6 +326,9 @@ The codemod reports these resolvers; pick a key name for each cursor.
 1.x method objects could be called directly on the server: `await server.foo()`, or
 `await usersModule.submodule.getUser()` from another module. In 2.0 `build()` and
 `buildSubmodule()` return a plain description of your API, so use `createCaller`:
+
+The codemod rewrites `someModule.submodule.method()` calls when it can find the module's
+`buildSubmodule()`, and reports the others.
 
 ```ts
 import { createCaller } from "meteor-rpc/server";
