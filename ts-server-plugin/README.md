@@ -2,15 +2,19 @@
 
 Enables **Go to Definition** (`Ctrl+B` / `F12`) on Meteor RPC method and publication names in any editor that uses the TypeScript language server (VS Code, Cursor, Neovim + tsserver, WebStorm, etc.).
 
-When you place your cursor on a method name in a client call such as `app.foo.baz(123)` and trigger Go to Definition, the plugin redirects you to the matching `createMethod("foo.baz", ...)` or `addMethod("baz", ...)` call site rather than to the library types.
+When you place your cursor on a method name in a client call such as `app.foo.baz(123)` and trigger Go to Definition, the plugin redirects you to the matching `createMethod("foo.baz", ...)` or `addMethod("baz", ...)` call site rather than to the library types. On a module name (`foo` in `app.foo.baz`) it goes to `createModule("foo")`.
+
+Works with meteor-rpc 1.x and 2.x.
 
 ## How it works
 
 The plugin wraps the TypeScript language service's `getDefinitionAndBoundSpan` handler. When triggered on an identifier, it:
 
 1. Resolves the identifier's type via the TypeScript type checker.
-2. Checks whether the type has a `config.name` property holding a string literal — the shape shared by `ReturnMethod<Name, ...>` and `ReturnSubscription<Name, ...>`.
-3. If found, searches all project source files for a `createMethod`, `createMutation`, `createQuery`, `createPublication`, `createRealtimeQuery`, `createSharedRealtimeQuery`, `addMethod`, `addPublication`, or `addSharedPublication` call whose first string argument matches that name.
+2. Works out the procedure name:
+   - **meteor-rpc 1.x**: the type has a `config.name` property holding a string literal, the shape shared by `ReturnMethod<Name, ...>` and `ReturnSubscription<Name, ...>`.
+   - **meteor-rpc 2.x**: client types don't carry the name, so when the identifier is a member of a client (`createClient<Server>()` from `meteor-rpc`, `meteor-rpc/client` or `meteor-rpc/react`), the plugin rebuilds the path from the property chain: `api.foo.baz` is `foo.baz`. Helpers such as `useQuery`, `useSuspenseQuery`, `useMutation` or `subscribe` are skipped, so the cursor can be on `baz` in `api.foo.baz.useQuery()`.
+3. Searches all project source files for a `createMethod`, `createMutation`, `createQuery`, `createPublication`, `createRealtimeQuery`, `createSharedRealtimeQuery`, `addMethod`, `addPublication`, or `addSharedPublication` call whose first string argument matches that name. When several modules register the same name, it prefers the `addMethod` chained on `createModule("foo")`.
 4. Returns the matching call site as the definition location.
 
 If no match is found it falls back to the default TypeScript behavior silently.

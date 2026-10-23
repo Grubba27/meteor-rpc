@@ -17,6 +17,24 @@ const MODULE_METHODS = new Set([
   "addSharedPublication",
 ]);
 
+// meteor-rpc 2 client helpers (api.x.useQuery, api.x.subscribe, …). meteor-rpc 2 reserves these
+// names, so a property matching them is a helper, never a method, publication or module.
+const RESERVED_HELPERS = new Set([
+  "subscribe",
+  "collection",
+  "collections",
+  "queryKey",
+  "queryOptions",
+  "mutationOptions",
+]);
+const isHelperName = (name: string) =>
+  RESERVED_HELPERS.has(name) || /^use[A-Z]/.test(name) || name.startsWith("$");
+
+// Type names declared next to each other in meteor-rpc 2's client typings. A declaration file
+// declaring a client type and a procedure type is meteor-rpc's, wherever it's installed.
+const CLIENT_TYPE_NAMES = ["Client", "ReactClient"];
+const PROCEDURE_TYPE_NAMES = ["MethodCaller", "ReactMethodClient"];
+
 function init(modules: { typescript: typeof ts }) {
   const ts = modules.typescript;
 
@@ -25,6 +43,9 @@ function init(modules: { typescript: typeof ts }) {
       info.project.projectService.logger.info(`[meteor-rpc] ${msg}`);
 
     log(`plugin loaded (TypeScript ${ts.version})`);
+
+    // Whether a declaration file is meteor-rpc 2's client typings, by source file.
+    const clientTypingsFiles = new WeakMap<ts.SourceFile, boolean>();
 
     // Build a pass-through proxy wrapping the real language service
     const proxy: ts.LanguageService = Object.create(null);
@@ -66,25 +87,38 @@ function init(modules: { typescript: typeof ts }) {
         const type = checker.getTypeAtLocation(node);
         log(`getDefinition: type is "${checker.typeToString(type)}"`);
 
+        let definition: ts.DefinitionInfo | undefined;
         const methodName = extractMethodName(type, checker, node);
-        if (!methodName) { log(`getDefinition: type has no config.name — not a ReturnMethod/ReturnSubscription`); return prior; }
+        if (methodName) {
+          log(`getDefinition: resolved method name "${methodName}" — searching project files`);
 
-        log(`getDefinition: resolved method name "${methodName}" — searching project files`);
+          // For submodule methods the full name is e.g. "example.exampleMethod"
+          // but the call site uses the local name "exampleMethod" inside createModule("example").
+          // Try the full name first, then fall back to the last dotted segment.
+          const localName = methodName.includes(".")
+            ? methodName.slice(methodName.lastIndexOf(".") + 1)
+            : methodName;
 
-        // For submodule methods the full name is e.g. "example.exampleMethod"
-        // but the call site uses the local name "exampleMethod" inside createModule("example").
-        // Try the full name first, then fall back to the last dotted segment.
-        const localName = methodName.includes(".")
-          ? methodName.slice(methodName.lastIndexOf(".") + 1)
-          : methodName;
+          // Search the project for the matching registration call site. For the local name,
+          // prefer the addMethod in createModule("<prefix>"): several modules can share a name.
+          definition =
+            findDefinition(methodName, program, sourceFile) ||
+            (localName !== methodName
+              ? findClientDefinition(methodName.split("."), program, sourceFile) ||
+                findDefinition(localName, program, sourceFile)
+              : undefined);
+        } else {
+          // meteor-rpc 2: client types don't carry the name, so rebuild it from the property chain.
+          const clientPath = extractClientPath(node, checker);
+          if (!clientPath) { log(`getDefinition: not a meteor-rpc 1.x method or 2.x client member`); return prior; }
 
-        // Search the project for the matching registration call site
-        const definition =
-          findDefinition(methodName, program, sourceFile) ||
-          (localName !== methodName
-            ? findDefinition(localName, program, sourceFile)
-            : undefined);
-        if (!definition) { log(`getDefinition: no call site found for "${methodName}"`); return prior; }
+          log(`getDefinition: meteor-rpc 2 ${clientPath.kind} "${clientPath.segments.map((s) => s ?? "*").join(".")}" — searching project files`);
+          definition =
+            clientPath.kind === "module"
+              ? findModuleDefinition(node.text, program, sourceFile)
+              : findClientDefinition(clientPath.segments, program, sourceFile);
+        }
+        if (!definition) { log(`getDefinition: no call site found for "${node.text}"`); return prior; }
 
         log(`getDefinition: found call site in ${definition.fileName}`);
 
@@ -152,6 +186,208 @@ function init(modules: { typescript: typeof ts }) {
       }
 
       return undefined;
+    }
+
+    /**
+     * meteor-rpc 2 clients are proxies typed with mapped types, so the procedure name isn't in
+     * the type. For an identifier in `api.users.loggedUser`, returns the path from the client to
+     * the identifier: ["users", "loggedUser"] (null for a computed segment such as `api[type]`),
+     * and whether the identifier is a module or a method/publication. undefined if the
+     * identifier isn't a member of a meteor-rpc 2 client, or is a helper (`useQuery`, …).
+     */
+    function extractClientPath(
+      node: ts.Identifier,
+      checker: ts.TypeChecker
+    ): { segments: Array<string | null>; kind: "module" | "procedure" } | undefined {
+      const parent = node.parent;
+      if (!parent || !ts.isPropertyAccessExpression(parent) || parent.name !== node) return undefined;
+      if (isHelperName(node.text)) return undefined;
+      const nodeType = checker.getTypeAtLocation(node);
+      if (!isClientType(nodeType)) return undefined;
+
+      const segments: Array<string | null> = [node.text];
+      let object: ts.Expression = parent.expression;
+      for (;;) {
+        const inner = skipParentheses(object);
+        // A segment is a property of a client; the client the chain starts from is not one.
+        if (ts.isPropertyAccessExpression(inner) && isClientType(checker.getTypeAtLocation(inner.expression))) {
+          segments.unshift(inner.name.text);
+          object = inner.expression;
+        } else if (ts.isElementAccessExpression(inner) && isClientType(checker.getTypeAtLocation(inner.expression))) {
+          const argument = inner.argumentExpression;
+          segments.unshift(ts.isStringLiteralLike(argument) ? argument.text : null);
+          object = inner.expression;
+        } else {
+          break;
+        }
+      }
+      if (!isClientType(checker.getTypeAtLocation(object))) return undefined;
+
+      // Methods are callable and publications have `subscribe`; anything else is a module.
+      const isProcedure =
+        nodeType.getCallSignatures().length > 0 || nodeType.getProperty("subscribe") !== undefined;
+      return { segments, kind: isProcedure ? "procedure" : "module" };
+    }
+
+    function skipParentheses(expression: ts.Expression): ts.Expression {
+      let current = expression;
+      while (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)) {
+        current = current.expression;
+      }
+      return current;
+    }
+
+    /** Whether every member of `type` is declared in meteor-rpc 2's client typings. */
+    function isClientType(type: ts.Type): boolean {
+      const members = type.isUnion() ? type.types : [type];
+      return (
+        members.length > 0 &&
+        members.every((member) =>
+          [member.aliasSymbol, member.getSymbol()].some((symbol) =>
+            symbol?.declarations?.some((declaration) =>
+              isClientTypingsFile(declaration.getSourceFile())
+            )
+          )
+        )
+      );
+    }
+
+    function isClientTypingsFile(sourceFile: ts.SourceFile): boolean {
+      if (!sourceFile.isDeclarationFile) return false;
+      const cached = clientTypingsFiles.get(sourceFile);
+      if (cached !== undefined) return cached;
+      const names = new Set<string>();
+      for (const statement of sourceFile.statements) {
+        if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) {
+          names.add(statement.name.text);
+        }
+      }
+      const result =
+        CLIENT_TYPE_NAMES.some((name) => names.has(name)) &&
+        PROCEDURE_TYPE_NAMES.some((name) => names.has(name));
+      clientTypingsFiles.set(sourceFile, result);
+      return result;
+    }
+
+    /**
+     * Finds the addMethod / addPublication / addSharedPublication call registering the last
+     * segment, preferring the one whose builder chain starts at createModule("<module>"), where
+     * <module> is the segment before it. Falls back to any registration with that name.
+     */
+    function findClientDefinition(
+      segments: Array<string | null>,
+      program: ts.Program,
+      currentFile: ts.SourceFile
+    ): ts.DefinitionInfo | undefined {
+      const name = segments[segments.length - 1];
+      if (name === null) return undefined;
+      // undefined: the root module; null: unknown (computed segment).
+      const moduleName = segments.length > 1 ? segments[segments.length - 2] : undefined;
+
+      let sameModule: ts.DefinitionInfo | undefined;
+      let unknownModule: ts.DefinitionInfo | undefined;
+      let otherModule: ts.DefinitionInfo | undefined;
+      for (const sourceFile of searchOrder(program, currentFile)) {
+        forEachCall(sourceFile, (call) => {
+          const callee = call.expression;
+          if (!ts.isPropertyAccessExpression(callee) || !MODULE_METHODS.has(callee.name.text)) return false;
+          const firstArg = call.arguments[0];
+          if (!firstArg || !ts.isStringLiteralLike(firstArg) || firstArg.text !== name) return false;
+
+          const definition = toDefinition(sourceFile, firstArg, name);
+          const builder = moduleOf(callee.expression);
+          if (moduleName === null || !builder.found) unknownModule ??= definition;
+          else if (builder.name === moduleName) sameModule ??= definition;
+          else otherModule ??= definition;
+          return sameModule !== undefined;
+        });
+        if (sameModule) return sameModule;
+      }
+      return unknownModule ?? otherModule;
+    }
+
+    /** Finds createModule("<name>"). */
+    function findModuleDefinition(
+      name: string,
+      program: ts.Program,
+      currentFile: ts.SourceFile
+    ): ts.DefinitionInfo | undefined {
+      for (const sourceFile of searchOrder(program, currentFile)) {
+        let found: ts.DefinitionInfo | undefined;
+        forEachCall(sourceFile, (call) => {
+          const firstArg = call.arguments[0];
+          if (
+            calleeName(call) === "createModule" &&
+            firstArg &&
+            ts.isStringLiteralLike(firstArg) &&
+            firstArg.text === name
+          ) {
+            found = toDefinition(sourceFile, firstArg, name);
+            return true;
+          }
+          return false;
+        });
+        if (found) return found;
+      }
+      return undefined;
+    }
+
+    /** Walks a builder chain (createModule("x").addMethod(…).addMethod) back to createModule. */
+    function moduleOf(expression: ts.Expression): { found: boolean; name?: string } {
+      let current = skipParentheses(expression);
+      for (;;) {
+        if (ts.isCallExpression(current)) {
+          if (calleeName(current) === "createModule") {
+            const firstArg = current.arguments[0];
+            return {
+              found: true,
+              name: firstArg && ts.isStringLiteralLike(firstArg) ? firstArg.text : undefined,
+            };
+          }
+          current = skipParentheses(current.expression);
+        } else if (ts.isPropertyAccessExpression(current)) {
+          current = skipParentheses(current.expression);
+        } else {
+          // The builder came from a variable or a function: its module is unknown.
+          return { found: false };
+        }
+      }
+    }
+
+    function calleeName(call: ts.CallExpression): string | undefined {
+      const callee = call.expression;
+      if (ts.isIdentifier(callee)) return callee.text;
+      if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
+      return undefined;
+    }
+
+    function searchOrder(program: ts.Program, currentFile: ts.SourceFile): ts.SourceFile[] {
+      const others = program
+        .getSourceFiles()
+        .filter((f) => f !== currentFile && !f.isDeclarationFile);
+      return [currentFile, ...others];
+    }
+
+    /** Calls `visit` for each call expression until it returns true. */
+    function forEachCall(sourceFile: ts.SourceFile, visit: (call: ts.CallExpression) => boolean) {
+      const walk = (node: ts.Node): boolean | undefined =>
+        (ts.isCallExpression(node) && visit(node)) || ts.forEachChild(node, walk);
+      ts.forEachChild(sourceFile, walk);
+    }
+
+    function toDefinition(
+      sourceFile: ts.SourceFile,
+      literal: ts.StringLiteralLike,
+      name: string
+    ): ts.DefinitionInfo {
+      return {
+        fileName: sourceFile.fileName,
+        textSpan: ts.createTextSpanFromBounds(literal.getStart(sourceFile), literal.getEnd()),
+        kind: ts.ScriptElementKind.functionElement,
+        name,
+        containerName: "",
+        containerKind: ts.ScriptElementKind.unknown,
+      };
     }
 
     /**
