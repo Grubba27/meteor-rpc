@@ -52,9 +52,18 @@ runtime bugs of 1.x. Upgrade guide: [MIGRATION.md](./MIGRATION.md). There's a co
 - Works with React 19 (#7) and Meteor 3.6 native types.
 - Agent skills shipped in the package: `skills/meteor-rpc` (writing methods, publications and React
   code, #15) and `skills/migrate-to-v2`.
+- `createCaller(module)` in `meteor-rpc/server` calls another module's methods from server code, the
+  way 1.x's `module.submodule.method()` did. It's typed from the module and runs the full pipeline
+  with the caller's `userId`.
+- `createClient({ suspense: true })`: every `useQuery` suspends like `useSuspenseQuery`, so `data` is
+  always defined. The codemod's `--suspense-client` keeps 1.x `useQuery` calls for it.
+- `ReturnType<typeof api.x.useQuery>` (and `useSuspenseQuery`) has the method's result as `data`,
+  as in 1.x, although the hooks are generic for `select`.
 
 ### Fixed
 
+- Creating a client no longer reads Meteor (the `Package` global), only calling it does, so modules
+  that create the client can be imported in unit tests.
 - Type errors inside `node_modules/meteor-rpc` in consumer apps (#10).
 - `usePublication` re-subscribing in a loop with object input (#8).
 - Nested submodules registering under the wrong name.

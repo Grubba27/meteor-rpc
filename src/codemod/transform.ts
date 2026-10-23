@@ -20,6 +20,7 @@ import {
   positionOf,
   propertyNameText,
   propertyValue,
+  REACT_CLIENT_SPECIFIERS,
   refersToRpcExport,
   scanRpcImports,
   shorten,
@@ -51,6 +52,15 @@ export interface TextEdit {
   readonly start: number;
   readonly end: number;
   readonly text: string;
+}
+
+export interface TransformOptions {
+  /**
+   * The app creates its React client with `{ suspense: true }`, so `useQuery` keeps suspending:
+   * keep the `useQuery` calls (only unwrap `{ useQueryOptions }`) and add the option to
+   * `createClient()` calls.
+   */
+  readonly suspenseClient?: boolean;
 }
 
 export interface TransformResult {
@@ -215,7 +225,9 @@ export function transform(
   sourceText: string,
   ts: TypeScript,
   project: Project,
+  options: TransformOptions = {},
 ): TransformResult {
+  const suspenseClient = options.suspenseClient === true;
   if (!QUICK_CHECK.test(sourceText)) {
     return { output: sourceText, changes: [], manual: [], edits: [] };
   }
@@ -362,7 +374,9 @@ export function transform(
     const keepManual = (detail: string) =>
       addManual(
         callee.name,
-        `${label} ${detail}: in 2.0 rename it to useSuspenseQuery() (suspends, like 1.x) and pass TanStack Query options directly as the 2nd argument, or use the new non-suspending useQuery()`,
+        suspenseClient
+          ? `${label} ${detail}: with { suspense: true } it keeps suspending; pass TanStack Query options directly as the 2nd argument`
+          : `${label} ${detail}: in 2.0 rename it to useSuspenseQuery() (suspends, like 1.x) and pass TanStack Query options directly as the 2nd argument, or use the new non-suspending useQuery()`,
         ANCHORS.react,
       );
     const args = call.arguments;
@@ -392,6 +406,16 @@ export function transform(
       } else if (!isUndefined(second)) {
         return keepManual("gets its options from an expression the codemod can't follow");
       }
+    }
+    if (suspenseClient) {
+      if (!second || options === undefined) return;
+      replace(second.getStart(sf), second.getEnd(), options);
+      addChange(
+        callee.name,
+        `${label}: options passed directly instead of { useQueryOptions } (it keeps suspending with { suspense: true })`,
+        ANCHORS.react,
+      );
+      return;
     }
     replace(callee.name.getStart(sf), callee.name.getEnd(), "useSuspenseQuery");
     if (second && options !== undefined) replace(second.getStart(sf), second.getEnd(), options);
@@ -653,10 +677,50 @@ export function transform(
     );
   };
 
+  /** `createClient<Server>()` → `createClient<Server>({ suspense: true })` (--suspense-client). */
+  const addSuspenseOption = (call: TS.CallExpression) => {
+    const change = () =>
+      addChange(
+        call.expression,
+        "createClient() → createClient({ suspense: true }): useQuery keeps suspending, like 1.x",
+        ANCHORS.react,
+      );
+    const [first, ...rest] = call.arguments;
+    if (!first) {
+      replace(call.arguments.pos, call.arguments.end, "{ suspense: true }");
+      return change();
+    }
+    if (rest.length === 0 && ts.isObjectLiteralExpression(first)) {
+      const existing = findProperty(first, "suspense", ts);
+      if (existing) {
+        const value = propertyValue(existing, ts);
+        if (value && value.kind === ts.SyntaxKind.TrueKeyword) return;
+      } else if (first.properties.length === 0) {
+        replace(first.getStart(sf), first.getEnd(), "{ suspense: true }");
+        return change();
+      } else {
+        const at = first.getStart(sf) + 1;
+        replace(at, at, " suspense: true,");
+        return change();
+      }
+    }
+    addManual(
+      call.expression,
+      "pass { suspense: true } to this createClient() call: useQuery then keeps suspending, like 1.x",
+      ANCHORS.react,
+    );
+  };
+
   // --- walk --------------------------------------------------------------------------------
 
   const visitCall = (call: TS.CallExpression) => {
     const callee = call.expression;
+    if (
+      suspenseClient &&
+      refersToRpcExport(callee, "createClient", imports, ts, REACT_CLIENT_SPECIFIERS)
+    ) {
+      return addSuspenseOption(call);
+    }
     if (!ts.isPropertyAccessExpression(callee)) return;
     const method = callee.name.text;
     if (method === "useQuery") {
@@ -695,7 +759,12 @@ export function transform(
       visitQualifiedReference(node.expression, node.name.text, node);
       const parent = node.parent;
       const called = ts.isCallExpression(parent) && parent.expression === node;
-      if (node.name.text === "useQuery" && !called && isClientChain(node.expression)) {
+      if (
+        !suspenseClient &&
+        node.name.text === "useQuery" &&
+        !called &&
+        isClientChain(node.expression)
+      ) {
         addManual(
           node.name,
           `${shorten(text(node))} is referenced without being called: in 2.0 useQuery() doesn't suspend, useSuspenseQuery() keeps the 1.x behavior`,

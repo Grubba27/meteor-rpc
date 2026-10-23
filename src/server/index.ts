@@ -17,6 +17,7 @@ export type { StandardSchemaV1 } from "../shared/standard-schema.js";
 export type {
   AfterResolveContext,
   BeforeResolveContext,
+  Caller,
   CursorDocs,
   CursorResult,
   Definition,
@@ -42,5 +43,6 @@ export type {
   RpcContext,
   Submodule,
 } from "../shared/types.js";
+export { createCaller } from "./caller.js";
 export { createModule } from "./module.js";
 export type { ModuleBuilder } from "./types.js";

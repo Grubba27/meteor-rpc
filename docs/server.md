@@ -10,6 +10,7 @@ Everything on this page comes from `meteor-rpc/server` (also re-exported by `met
 - [Hooks](#hooks)
 - [Rate limits](#rate-limits)
 - [Names](#names)
+- [Calling other modules from the server](#calling-other-modules-from-the-server)
 - [How a call runs](#how-a-call-runs)
 
 ## Modules
@@ -201,6 +202,40 @@ createModule()
   submodules.
 - **Checked twice.** TypeScript reports these mistakes as you type, and `addMethod` & co. throw at
   runtime.
+
+## Calling other modules from the server
+
+To call a method of another module from server code, for example from a resolver, use
+`createCaller`:
+
+```ts
+import { Meteor } from "meteor/meteor";
+import { createCaller, createModule } from "meteor-rpc/server";
+import { z } from "zod";
+import { Tasks } from "/imports/api/tasks";
+
+export const users = createModule("users")
+  .addMethod("isAdmin", z.object({ id: z.string() }), async ({ id }) => id === "admin")
+  .buildSubmodule();
+
+export const tasks = createModule("tasks")
+  .addMethod("clear", z.void(), async (_input, { userId }) => {
+    const isAdmin = await createCaller(users).isAdmin({ id: userId ?? "" });
+    if (!isAdmin) throw new Meteor.Error("not-authorized");
+    return Tasks.removeAsync({});
+  })
+  .buildSubmodule();
+```
+
+- **Same pipeline.** Calls go through `Meteor.callAsync`, so they're validated and run the
+  middlewares and hooks. Inside a method, they run with that method's `userId`.
+- **Any module.** Pass a `buildSubmodule()` result or the root router from `build()`. A caller
+  only has methods: subscribing needs a client connection.
+- **Full names.** A submodule learns its full name (`chat.messages.send`) when the root module is
+  built, so the name is resolved on each call. You can create the caller at import time.
+- **Not `createClient<Server>()`.** Inside a module that is part of `Server`, typing a client with
+  `Server` makes `Server` refer to itself (TS2456). `createCaller` is typed from the module you
+  pass.
 
 ## How a call runs
 

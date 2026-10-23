@@ -37,6 +37,22 @@ the first copy that registers it, so the other copy never receives documents. Ma
 go through one build: `meteor npm ls meteor-rpc` should show a single version, and dependencies
 shouldn't bundle their own copy.
 
+### `meteor-rpc: Meteor from the "meteor" Meteor package is not available` in unit tests
+
+meteor-rpc never imports `meteor/*`: it reads Meteor from the `Package` global that Meteor fills
+at runtime. So mocks of `meteor/meteor` (`vi.mock`, module aliases) don't reach it. Creating a
+client works without Meteor, but calling a method needs it. Point the global at your stub in the
+test setup file:
+
+```ts
+// vitest.setup.ts
+import { Meteor } from "meteor/meteor"; // your stub, e.g. through a vitest alias
+
+Object.assign(globalThis, { Package: { meteor: { Meteor } } });
+```
+
+Tests that replace `Meteor.callAsync` on that stub then receive the calls.
+
 ### `` `rateLimit` needs the ddp-rate-limiter package ``
 
 Run `meteor add ddp-rate-limiter`.

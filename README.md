@@ -145,6 +145,7 @@ A complete app lives in [`examples/basic`](./examples/basic).
 | `addSharedPublication(name, schema, resolver, config?)` (named cursors) | `usePublication(input)` → `{ data: { key: [] }, collections }`, `subscribe`, `collections(input)` |
 | `createModule("ns")…buildSubmodule()` + `addSubmodule` | `api.ns.x` |
 | `addMiddlewares([fn])`, `config.hooks`, `config.rateLimit` | Errors as `Meteor.Error`; `isValidationError(error)` |
+| `createCaller(module).x(input)`: call another module from server code | `createClient<Server>({ suspense: true })`: every `useQuery` suspends, so `data` is always defined |
 
 ## Documentation
 

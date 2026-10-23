@@ -26,6 +26,12 @@ export type MethodMutationKey = readonly [name: string];
 /** Variables of `useMutation`: optional when the schema accepts `undefined`. */
 export type MutationVariables<TInput> = undefined extends TInput ? TInput | void : TInput;
 
+/**
+ * `data` of a query hook: what `select` returns, or the method's result. `ReturnType<typeof
+ * api.x.useQuery>` instantiates `TData` as `unknown`, so it reads as the method's result too.
+ */
+export type QueryData<TResult, TData> = unknown extends TData ? TResult : TData;
+
 export type QueryOptionsFor<TResult, TData = TResult> = Omit<
   UseQueryOptions<TResult, Error, TData, MethodQueryKey>,
   "queryKey" | "queryFn"
@@ -45,11 +51,11 @@ export interface ReactMethodClient<TInput, TResult> extends MethodCaller<TInput,
   /** TanStack Query `useQuery` for this method. Doesn't suspend. */
   useQuery<TData = TResult>(
     ...args: [...InputArgs<TInput>, options?: QueryOptionsFor<TResult, TData>]
-  ): UseQueryResult<TData, Error>;
+  ): UseQueryResult<QueryData<TResult, TData>, Error>;
   /** TanStack Query `useSuspenseQuery` for this method. Needs a `<Suspense>` boundary. */
   useSuspenseQuery<TData = TResult>(
     ...args: [...InputArgs<TInput>, options?: SuspenseQueryOptionsFor<TResult, TData>]
-  ): UseSuspenseQueryResult<TData, Error>;
+  ): UseSuspenseQueryResult<QueryData<TResult, TData>, Error>;
   /** TanStack Query `useMutation` for this method. */
   useMutation<TContext = unknown>(
     options?: MutationOptionsFor<TInput, TResult, TContext>,
@@ -107,4 +113,28 @@ export type ReactClient<TRouter> = {
         ? ReactRecordPublicationClient<TTypes["input"], TTypes["docs"]>
         : ReactCursorPublicationClient<TTypes["input"], TTypes["docs"]>
       : ReactClient<TRouter[K]>;
+};
+
+/** A method of a client created with `{ suspense: true }`: its `useQuery` suspends. */
+export interface SuspenseReactMethodClient<TInput, TResult>
+  extends MethodCaller<TInput, TResult>,
+    Omit<ReactMethodClient<TInput, TResult>, "useQuery"> {
+  /**
+   * TanStack Query `useSuspenseQuery` for this method, because the client was created with
+   * `{ suspense: true }`: `data` is always defined. Needs a `<Suspense>` boundary.
+   */
+  useQuery<TData = TResult>(
+    ...args: [...InputArgs<TInput>, options?: SuspenseQueryOptionsFor<TResult, TData>]
+  ): UseSuspenseQueryResult<QueryData<TResult, TData>, Error>;
+}
+
+/** The React client created with `createClient<typeof server>({ suspense: true })`: `useQuery` suspends. */
+export type SuspenseReactClient<TRouter> = {
+  readonly [K in keyof TRouter]: TRouter[K] extends MethodDefinition<infer TTypes>
+    ? SuspenseReactMethodClient<TTypes["input"], TTypes["result"]>
+    : TRouter[K] extends PublicationDefinition<infer TTypes>
+      ? TTypes["shape"] extends "record"
+        ? ReactRecordPublicationClient<TTypes["input"], TTypes["docs"]>
+        : ReactCursorPublicationClient<TTypes["input"], TTypes["docs"]>
+      : SuspenseReactClient<TRouter[K]>;
 };

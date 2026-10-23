@@ -44,6 +44,28 @@ describe("modules", () => {
     assert.equal(server.method_handlers["moderation.deleteMessage"], undefined);
   });
 
+  it("createCaller calls other modules from a resolver, with the caller's userId", async () => {
+    await probe.loginAs("caller-user");
+    events.length = 0;
+    const result = await probe.viaCaller();
+    assert.deepEqual(result, {
+      ran: "ran",
+      who: { thisUserId: "caller-user", ctxUserId: "caller-user" },
+    });
+    // Each nested call runs the whole pipeline, root middlewares first.
+    assert.deepEqual(events, [
+      "probe:method:probe.viaCaller",
+      "probe:method:probe.outer.inner.run",
+      "outer:method:probe.outer.inner.run",
+      "inner:method:probe.outer.inner.run",
+      "before:method:probe.outer.inner.run",
+      "resolver:method",
+      "after:method:probe.outer.inner.run",
+      "probe:method:probe.callee.whoami",
+      "callee:probe.callee.whoami",
+    ]);
+  });
+
   it("calls a nested submodule method end to end (chat.moderation.deleteMessage)", async () => {
     await api.auth.guest();
     const roomId = await api.chat.createRoom({ name: "Mine" });

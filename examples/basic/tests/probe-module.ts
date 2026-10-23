@@ -1,7 +1,7 @@
 // A second root module, registered only in tests, that records what the server sees.
 // Its names live under "probe." so they never clash with the example API.
 import { Meteor } from "meteor/meteor";
-import { createModule, type MiddlewareContext } from "meteor-rpc/server";
+import { createCaller, createModule, type MiddlewareContext } from "meteor-rpc/server";
 import { z } from "zod";
 import { Messages } from "/imports/api/collections";
 
@@ -46,9 +46,23 @@ const outer = createModule("outer")
   .addSubmodule(inner)
   .buildSubmodule();
 
+// Called from probe.viaCaller through createCaller, to check what a nested call sees.
+const callee = createModule("callee")
+  .addMethod("whoami", z.void(), async function (_input, ctx) {
+    events.push(`callee:${ctx.name}`);
+    return { thisUserId: this.userId, ctxUserId: ctx.userId };
+  })
+  .buildSubmodule();
+
 const probe = createModule("probe")
   .addMiddlewares([record("probe")])
   .addSubmodule(outer)
+  .addSubmodule(callee)
+  .addMethod("viaCaller", z.void(), async () => ({
+    // inner is nested twice (probe.outer.inner): createCaller finds its full name.
+    ran: await createCaller(inner).run(),
+    who: await createCaller(callee).whoami(),
+  }))
   .addMethod("whoami", z.void(), async function (_input, ctx) {
     return {
       thisUserId: this.userId,

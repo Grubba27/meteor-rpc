@@ -67,6 +67,27 @@ describe("React client", () => {
     expect(await screen.findByText("answer 42")).toBeTruthy();
   });
 
+  it("useQuery suspends with { suspense: true }, and errors reach the error boundary", async () => {
+    const server = createModule()
+      .addMethod("double", z.number(), (n) => {
+        if (n < 0) throw new MeteorError("negative");
+        return n * 2;
+      })
+      .build();
+    const api = createClient<typeof server>({ suspense: true });
+    function Double({ n }: { n: number }) {
+      const { data } = api.double.useQuery(n, { staleTime: 1000 });
+      return <p>double {data.toFixed(0)}</p>;
+    }
+    renderWithProviders(<Double n={21} />);
+    expect(screen.getByText("loading")).toBeTruthy();
+    expect(await screen.findByText("double 42")).toBeTruthy();
+
+    document.body.innerHTML = "";
+    renderWithProviders(<Double n={-1} />);
+    expect(await screen.findByText("error: negative")).toBeTruthy();
+  });
+
   it("useMutation works for methods without input", async () => {
     let calls = 0;
     const server = createModule()

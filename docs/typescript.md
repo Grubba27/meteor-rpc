@@ -43,13 +43,15 @@ Keep `import type`, so the server module (and its dependencies) never reaches th
 From `meteor-rpc/server`:
 
 - **Definitions:** `MethodDefinition`, `PublicationDefinition`, `Router`, `Submodule`, `ModuleBuilder`.
+- **Server-side calls:** `Caller` (what `createCaller` returns).
 - **Contexts:** `MethodContext`, `PublicationContext`, `MiddlewareContext`, `Middleware`, `Hooks`.
 - **Meteor objects:** `MethodInvocation`, `Subscription`, `ConnectionInfo`.
 - **Schemas:** `InferInput`, `InferOutput`, `StandardSchemaV1`.
 
 From `meteor-rpc/client` and `meteor-rpc/react`:
 
-- `Client`, `ReactClient`, `MethodCaller`, `ClientCollection`, `ValidationIssue`, `MethodQueryKey`.
+- `Client`, `ReactClient`, `MethodCaller`, `ClientCollection`, `ValidationIssue`, `MethodQueryKey`, `QueryData`.
+- With `{ suspense: true }`: `SuspenseReactClient`, `SuspenseReactMethodClient`. The options type is `ReactClientOptions`.
 
 Annotating a client explicitly:
 
@@ -67,6 +69,8 @@ readable and type-checking fast.
 ## Mistakes caught at compile time
 
 - Wrong or missing input: `api.users.get()` when the schema needs `{ id }`.
+- `createClient<Server>({ suspense })` with a `boolean` variable: the client type depends on the
+  option, so pass `true` or `false` literally.
 - Unknown methods and publications.
 - `build()` on a namespaced module, and `buildSubmodule()` on the root.
 - Duplicate, dotted or reserved names (`subscribe`, `useSomething`, `$something`, …).

@@ -56,6 +56,10 @@ It handles:
 - `(raw, parsed) => …` hooks and middlewares → `({ raw, parsed }) => …` ([§5](#5-hooks-and-middlewares-take-one-context-object))
 - `"meteor/grubba:rpc"` imports → `"meteor-rpc"` ([§2](#2-install))
 
+With `--suspense-client` it keeps your `useQuery` calls instead: it only unwraps
+`{ useQueryOptions }`, and creates the React client with `{ suspense: true }` so they keep
+suspending ([§8](#8-react-usequery-vs-usesuspensequery)).
+
 > **Run `--write` once, on 1.x code.** The codemod can't tell a 1.x `useQuery` (which suspended)
 > from a 2.0 `useQuery` (which doesn't). Running it again after you wrote new 2.0 code would rename
 > those calls to `useSuspenseQuery` too.
@@ -214,6 +218,18 @@ Query's names. The codemod renames existing calls, so behavior doesn't change.
 | — | `api.x.useQuery(input, options)`: doesn't suspend; returns `isPending`, `data \| undefined` |
 | — | `api.x.queryKey(input?)`, `api.x.queryOptions(input, options?)`, `api.x.mutationOptions(options?)` |
 
+**Fewer changes: keep `useQuery` suspending.** Create the client with `{ suspense: true }`. Every
+`useQuery` then suspends like in 1.x, so its `data` is always defined, and only the options change:
+
+```ts
+export const api = createClient<Server>({ suspense: true });
+
+const { data } = api.todos.list.useQuery({ listId }, { refetchInterval: 5000 }); // was { useQueryOptions: { … } }
+```
+
+`meteor-rpc-migrate --suspense-client` makes exactly these changes. Types such as
+`ReturnType<typeof api.todos.list.useQuery>["data"]` keep working.
+
 Invalidate after a mutation with the new `queryKey` helper:
 
 ```ts
@@ -301,14 +317,23 @@ The codemod reports these resolvers; pick a key name for each cursor.
 
 ### 13. Calling methods from the server
 
-1.x method objects could be called directly on the server (`await server.foo()`). In 2.0 `build()`
-returns a plain description of your API, so create a client on the server too:
+1.x method objects could be called directly on the server: `await server.foo()`, or
+`await usersModule.submodule.getUser()` from another module. In 2.0 `build()` and
+`buildSubmodule()` return a plain description of your API, so use `createCaller`:
 
 ```ts
-import { createClient } from "meteor-rpc/client";
-const api = createClient<Server>();
-await api.foo(); // runs the method through Meteor.callAsync, with validation and middlewares
+import { createCaller } from "meteor-rpc/server";
+
+// 1.x: await usersModule.submodule.getUser();
+const user = await createCaller(usersModule).getUser();
+// 1.x: await server.foo();
+await createCaller(server).foo();
 ```
+
+Calls run through `Meteor.callAsync`, with validation, middlewares and hooks, like in 1.x. Inside a
+method they keep its `userId`. Don't use `createClient<Server>()` inside a module that is part of
+`Server`: it makes the `Server` type circular (TS2456). Outside the module tree (scripts, cron
+jobs) `createClient<Server>()` from `meteor-rpc/client` works too.
 
 ## Troubleshooting
 

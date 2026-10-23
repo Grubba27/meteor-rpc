@@ -1,8 +1,8 @@
 import type { ClientOptions } from "../client/index.js";
 import { createProxy } from "../client/proxy.js";
 import { createTransport } from "../client/transport.js";
-import { reactHelpers } from "./helpers.js";
-import type { ReactClient } from "./types.js";
+import { reactHelpers, suspenseReactHelpers } from "./helpers.js";
+import type { ReactClient, SuspenseReactClient } from "./types.js";
 
 export {
   type Client,
@@ -31,6 +31,7 @@ export type {
   MethodQueryKey,
   MutationOptionsFor,
   MutationVariables,
+  QueryData,
   QueryOptionsFor,
   ReactClient,
   ReactCursorPublicationClient,
@@ -38,7 +39,18 @@ export type {
   ReactRecordPublicationClient,
   RecordPublicationResult,
   SuspenseQueryOptionsFor,
+  SuspenseReactClient,
+  SuspenseReactMethodClient,
 } from "./types.js";
+
+/** Options of the React client. */
+export interface ReactClientOptions extends ClientOptions {
+  /**
+   * Makes `useQuery` suspend like `useSuspenseQuery`, so its `data` is always defined. The
+   * components need a `<Suspense>` boundary and an error boundary above them.
+   */
+  suspense?: boolean | undefined;
+}
 
 /**
  * Creates the typed client with React hooks (TanStack Query + publications).
@@ -48,7 +60,19 @@ export type {
  * import type { Server } from "/imports/api/server";
  * export const api = createClient<Server>();
  * ```
+ *
+ * With `{ suspense: true }`, `useQuery` suspends (it's `useSuspenseQuery`), so `data` is always
+ * defined.
  */
-export function createClient<TRouter>(options?: ClientOptions): ReactClient<TRouter> {
-  return createProxy(createTransport(options?.connection), reactHelpers) as ReactClient<TRouter>;
+export function createClient<TRouter>(
+  options: ReactClientOptions & { suspense: true },
+): SuspenseReactClient<TRouter>;
+export function createClient<TRouter>(
+  options?: ReactClientOptions & { suspense?: false | undefined },
+): ReactClient<TRouter>;
+export function createClient<TRouter>(
+  options?: ReactClientOptions,
+): ReactClient<TRouter> | SuspenseReactClient<TRouter> {
+  const helpers = options?.suspense ? suspenseReactHelpers : reactHelpers;
+  return createProxy(createTransport(options?.connection), helpers) as ReactClient<TRouter>;
 }

@@ -48,6 +48,27 @@ function Profile({ id }: { id: string }) {
 
 Methods without input are called with `mutate()` and `useQuery()`.
 
+### Suspense by default
+
+Create the client with `{ suspense: true }` to make every `useQuery` suspend, as
+`useSuspenseQuery` does. `data` is then always defined, and loading and errors go to the nearest
+`<Suspense>` and error boundary:
+
+```tsx
+import { createClient } from "meteor-rpc/react";
+import type { Server } from "/imports/api/server";
+
+export const api = createClient<Server>({ suspense: true });
+
+function UserName({ id }: { id: string }) {
+  const { data: user } = api.users.get.useQuery({ id }); // suspends; `user` is never undefined
+  return <span>{user.name}</span>;
+}
+```
+
+`useQuery` then takes `useSuspenseQuery`'s options (no `enabled`, for example). For a query that
+shouldn't suspend, use TanStack Query's `useQuery` with `api.x.queryOptions(input)`.
+
 ### Query keys and options
 
 - **`api.x.queryKey(input?)`** returns the key the hooks use: `["users.get", input]`. Without
