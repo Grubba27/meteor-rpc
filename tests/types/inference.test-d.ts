@@ -12,8 +12,14 @@ import { z } from "zod";
 import { z as z3 } from "zod3";
 import type { ClientCollection, SubscriptionHandle } from "../../src/client/index";
 import { createClient as createCoreClient } from "../../src/client/index";
-import { createClient } from "../../src/react/index";
 import {
+  createClient,
+  type ReactClient,
+  type ReactClientOptions,
+  type SuspenseReactClient,
+} from "../../src/react/index";
+import {
+  createCaller,
   createModule,
   type MethodContext,
   type PublicationContext,
@@ -120,6 +126,21 @@ describe("React client", () => {
     expectTypeOf(selected.data).toEqualTypeOf<string | undefined>();
   });
 
+  it("types ReturnType of a hook with the method's result", () => {
+    expectTypeOf<ReturnType<typeof api.double.useQuery>["data"]>().toEqualTypeOf<
+      number | undefined
+    >();
+    expectTypeOf<ReturnType<typeof api.double.useSuspenseQuery>["data"]>().toEqualTypeOf<number>();
+  });
+
+  it("calls hooks through a union of clients", () => {
+    // e.g. api[isWebApp ? "webapps" : "apps"].getContainers.useQuery(input)
+    const key = Math.random() > 0.5 ? ("ping" as const) : ("optional" as const);
+    api[key].useQuery(undefined);
+    api[key].useSuspenseQuery(undefined);
+    createClient<Server>({ suspense: true })[key].useQuery(undefined);
+  });
+
   it("types mutations, with optional variables for void input", () => {
     const ping = api.ping.useMutation();
     expectTypeOf(ping).toEqualTypeOf<UseMutationResult<"pong", Error, void, unknown>>();
@@ -143,6 +164,73 @@ describe("React client", () => {
     const room = api.chat.room.usePublication("r1");
     expectTypeOf(room.data.messages).toEqualTypeOf<Message[]>();
     expectTypeOf(room.collections.room).toEqualTypeOf<ClientCollection<Room>>();
+  });
+});
+
+describe("React client with { suspense: true }", () => {
+  const api = createClient<Server>({ suspense: true });
+
+  it("makes useQuery suspend, so data is always defined", () => {
+    expectTypeOf(api.ping.useQuery()).toEqualTypeOf<UseSuspenseQueryResult<"pong", Error>>();
+    expectTypeOf(api.double.useQuery("1").data).toEqualTypeOf<number>();
+    expectTypeOf(api.chat.messages.send.useQuery({ text: "hi" }).data).toEqualTypeOf<{
+      id: string;
+      text: string;
+    }>();
+    const selected = api.double.useQuery("1", { select: (n) => String(n) });
+    expectTypeOf(selected.data).toEqualTypeOf<string>();
+    expectTypeOf<ReturnType<typeof api.double.useQuery>["data"]>().toEqualTypeOf<number>();
+    // @ts-expect-error suspense queries can't be disabled
+    api.double.useQuery("1", { enabled: false });
+  });
+
+  it("keeps the other helpers and the plain call", () => {
+    expectTypeOf(api.ping()).toEqualTypeOf<Promise<"pong">>();
+    expectTypeOf(api.ping.useMutation()).toEqualTypeOf<
+      UseMutationResult<"pong", Error, void, unknown>
+    >();
+    expectTypeOf(api.double.useSuspenseQuery("1").data).toEqualTypeOf<number>();
+    expectTypeOf(api.chat.rooms.usePublication().data).toEqualTypeOf<Room[]>();
+  });
+
+  it("picks the client from a literal option, and accepts options only known at runtime", () => {
+    expectTypeOf(createClient<Server>({ suspense: false }).ping.useQuery()).toEqualTypeOf<
+      UseQueryResult<"pong", Error>
+    >();
+    const suspense = Math.random() > 0.5;
+    expectTypeOf(createClient<Server>({ suspense })).toEqualTypeOf<
+      ReactClient<Server> | SuspenseReactClient<Server>
+    >();
+    const options: ReactClientOptions = { suspense: true };
+    expectTypeOf(createClient<Server>(options)).toEqualTypeOf<
+      ReactClient<Server> | SuspenseReactClient<Server>
+    >();
+  });
+
+  it("keeps any from select", () => {
+    const anyItems = createClient<Server>().double.useQuery("1", {
+      select: (n): any => [n],
+    });
+    expectTypeOf(anyItems.data).toBeAny();
+  });
+});
+
+describe("createCaller", () => {
+  it("types the methods of a submodule", () => {
+    const caller = createCaller(messages);
+    expectTypeOf(caller.send({ text: "hi" })).toEqualTypeOf<
+      Promise<{ id: string; text: string }>
+    >();
+    // @ts-expect-error input is checked
+    caller.send({ text: 1 });
+  });
+
+  it("types the root router and nested modules, without publications", () => {
+    const caller = createCaller(server);
+    expectTypeOf(caller.ping()).toEqualTypeOf<Promise<"pong">>();
+    expectTypeOf(caller.chat.messages.send).parameter(0).toEqualTypeOf<{ text: string }>();
+    // @ts-expect-error publications can't be called from the server
+    caller.chat.rooms;
   });
 });
 

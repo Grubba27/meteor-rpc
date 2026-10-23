@@ -21,7 +21,7 @@ runtime), on Meteor 3.0+.
 | --- | --- |
 | `src/meteor/` | **The Meteor boundary.** The only code that touches Meteor. `package.ts` reads each package from the `Package` global on first use, and every module narrows it to a small structural interface. `types.ts` holds the public Meteor-like types (`Subscription`, `ClientCollection`, …). |
 | `src/shared/` | Code used by server and client: `types.ts` (definitions, contexts, hooks, `Client<T>`), `schema.ts` (Standard Schema validation), `standard-schema.ts` (vendored spec), `errors.ts`, `names.ts` (reserved names, collection names). |
-| `src/server/` | `module.ts` (immutable builder state, `createModule`), `register.ts` (`build()` → `Meteor.methods` / `Meteor.publish`, the one call pipeline, publishing), `types.ts` (`ModuleBuilder` interface). |
+| `src/server/` | `module.ts` (immutable builder state, `createModule`), `register.ts` (`build()` → `Meteor.methods` / `Meteor.publish`, the one call pipeline, publishing), `types.ts` (`ModuleBuilder` interface), `caller.ts` (`createCaller`: server-side calls into a module, resolved to its full name per call). |
 | `src/client/` | `proxy.ts` (pure path → name resolution), `transport.ts` (calls, subscriptions, per-connection collection registry), `helpers.ts` (`subscribe`, `collection`, `collections`, `subscribeInstance`). |
 | `src/react/` | `helpers.ts` (TanStack Query hooks, `queryKey`/`queryOptions`/`mutationOptions`), `use-publication.ts`, `types.ts` (`ReactClient<T>`), `vendor/` (adapted react-meteor-data hooks, MIT, see headers). |
 | `src/codemod/` | `meteor-rpc-migrate`: the v1 → v2 codemod (TypeScript compiler API, loaded at runtime). |

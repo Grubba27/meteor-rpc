@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { TypeScript } from "./ast.js";
 import { createProject, type ProjectHost } from "./project.js";
-import { type TransformResult, transform } from "./transform.js";
+import { type TransformOptions, type TransformResult, transform } from "./transform.js";
 
 export const SOURCE_EXTENSIONS: readonly string[] = [
   ".ts",
@@ -108,13 +108,19 @@ export function migrateFiles(
   fileNames: readonly string[],
   ts: TypeScript,
   host: ProjectHost = nodeHost(),
+  options: TransformOptions = {},
 ): FileResult[] {
   const project = createProject(ts, host);
+  const runOptions: TransformOptions = { ...options, runFiles: new Set(fileNames) };
   const results: FileResult[] = [];
   for (const fileName of fileNames) {
     const source = host.readFile(fileName);
     if (source === undefined) continue;
-    results.push({ fileName, source, result: transform(fileName, source, ts, project) });
+    results.push({
+      fileName,
+      source,
+      result: transform(fileName, source, ts, project, runOptions),
+    });
   }
   return results;
 }

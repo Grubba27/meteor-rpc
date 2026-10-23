@@ -237,3 +237,15 @@ export type Client<TRouter> = {
         : CursorPublicationClient<TTypes["input"], TTypes["docs"]>
       : Client<TRouter[K]>;
 };
+
+/**
+ * The methods of a router, for server code: `createCaller(module)` from `meteor-rpc/server`.
+ * Publications are left out: subscribing needs a client connection.
+ */
+export type Caller<TRouter> = {
+  readonly [K in keyof TRouter as TRouter[K] extends PublicationDefinition<any>
+    ? never
+    : K]: TRouter[K] extends MethodDefinition<infer TTypes>
+    ? MethodCaller<TTypes["input"], TTypes["result"]>
+    : Caller<TRouter[K]>;
+};

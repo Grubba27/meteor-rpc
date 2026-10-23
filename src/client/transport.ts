@@ -18,11 +18,14 @@ const registries = new WeakMap<object, Map<string, Collection<any>>>();
 
 export function createTransport(custom?: ConnectionLike): Transport {
   const connection: ConnectionLike = custom ?? Meteor;
-  const canSubscribe = custom !== undefined || Meteor.isClient;
+  // Meteor is only read on use, so a client can be created at import time without Meteor (tests).
+  const canSubscribe = () => custom !== undefined || Meteor.isClient;
 
   return {
     connection,
-    canSubscribe,
+    get canSubscribe() {
+      return canSubscribe();
+    },
     call(name, input) {
       if (typeof connection.callAsync !== "function") {
         return Promise.reject(
@@ -33,7 +36,7 @@ export function createTransport(custom?: ConnectionLike): Transport {
       return input === undefined ? connection.callAsync(name) : connection.callAsync(name, input);
     },
     subscribe(name, input, callbacks) {
-      if (!canSubscribe) {
+      if (!canSubscribe()) {
         throw new Error(
           "meteor-rpc: subscriptions need a client. On the server, pass a DDP connection: createClient({ connection: DDP.connect(url) }).",
         );
@@ -43,7 +46,7 @@ export function createTransport(custom?: ConnectionLike): Transport {
       return connection.subscribe(name, ...args);
     },
     collection<TDoc>(name: string): Collection<TDoc> {
-      if (!canSubscribe) {
+      if (!canSubscribe()) {
         throw new Error(
           "meteor-rpc: publication data only exists on the client. On the server, pass a DDP connection to createClient.",
         );

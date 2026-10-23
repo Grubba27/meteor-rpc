@@ -39,3 +39,9 @@ export const reactHelpers: Readonly<Record<string, Helper>> = {
   useMutation: (transport, path, args) => useMutation(mutationOptions(transport, path, args)),
   usePublication: (transport, path, args) => usePublication(transport, path, args[0]),
 };
+
+/** Helpers of a client created with `{ suspense: true }`: `useQuery` is `useSuspenseQuery`. */
+export const suspenseReactHelpers: Readonly<Record<string, Helper>> = {
+  ...reactHelpers,
+  useQuery: (transport, path, args) => useSuspenseQuery(queryOptions(transport, path, args)),
+};

@@ -1,5 +1,6 @@
 // Test-only procedures the browser tests (react.test.tsx) call to arrange and inspect server
 // state. Registered only by tests/server.ts; names live under "browser.".
+import { Meteor } from "meteor/meteor";
 import { createModule } from "meteor-rpc/server";
 import { z } from "zod";
 import { Messages } from "/imports/api/collections";
@@ -24,6 +25,10 @@ const browser = createModule("browser")
       Messages.insertAsync({ roomId, text, userId: "server", createdAt }),
   )
   .addMethod("runs", z.string(), (id) => runs.get(id) ?? 0)
+  .addMethod("square", z.number(), (n) => {
+    if (n < 0) throw new Meteor.Error("negative");
+    return n * n;
+  })
   .addPublication("counted", z.object({ id: z.string(), page: z.number() }), ({ id }) => {
     runs.set(id, (runs.get(id) ?? 0) + 1);
     return Messages.find({ roomId: id });

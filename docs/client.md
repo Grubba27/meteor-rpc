@@ -66,6 +66,10 @@ await api.tasks.add({ title: "Created by a cron job" });
 Subscriptions need a client connection. On the server with the default connection, `subscribe`,
 `collection` and `collections` throw.
 
+Inside a module that is part of `Server` (a resolver calling another module), use
+`createCaller(module)` instead: `createClient<Server>()` there makes the `Server` type refer to
+itself. See [Server › Calling other modules from the server](./server.md#calling-other-modules-from-the-server).
+
 ## Another Meteor server
 
 Pass any DDP connection:

@@ -47,6 +47,53 @@ export interface ModuleState {
 
 const submoduleStates = new WeakMap<object, ModuleState>();
 const builtRouters = new WeakMap<ModuleState, RouterRecord>();
+const rootRouters = new WeakSet<object>();
+// The module of each nested router object (`server.chat`, `chat.submodule`), for `createCaller`.
+const routerStates = new WeakMap<object, ModuleState>();
+// Full dotted paths of each submodule, recorded when a root module containing it is built.
+const submodulePaths = new WeakMap<ModuleState, Set<string>>();
+
+function recordSubmodulePaths(state: ModuleState, path: readonly string[]): void {
+  for (const entry of state.entries) {
+    if (entry.kind !== "submodule") continue;
+    const entryPath = [...path, entry.name];
+    let paths = submodulePaths.get(entry.state);
+    if (!paths) {
+      paths = new Set();
+      submodulePaths.set(entry.state, paths);
+    }
+    paths.add(entryPath.join("."));
+    recordSubmodulePaths(entry.state, entryPath);
+  }
+}
+
+/**
+ * For `createCaller`: returns a function giving the dotted path that the methods of `target`
+ * (a `buildSubmodule()` result or a `build()` router) are registered under. Submodules only know
+ * their path once a root module containing them is built, so it's resolved on each call.
+ */
+export function modulePathOf(target: unknown): () => readonly string[] {
+  if (typeof target === "object" && target !== null) {
+    if (rootRouters.has(target)) return () => [];
+    const state = submoduleStates.get(target) ?? routerStates.get(target);
+    if (state?.prefix !== undefined) {
+      const prefix = state.prefix;
+      return () => {
+        const paths = [...(submodulePaths.get(state) ?? [])];
+        if (paths.length === 1) return paths[0]!.split(".");
+        if (paths.length === 0) {
+          fail(
+            `module "${prefix}" isn't part of a built module yet: add it to the root module and call build() first`,
+          );
+        }
+        fail(
+          `module "${prefix}" is added in several places (${paths.join(", ")}): pass createCaller() a module that contains it once, and call it through that module`,
+        );
+      };
+    }
+  }
+  fail("createCaller expects a module from buildSubmodule() or build(), or a part of one");
+}
 
 function fail(message: string): never {
   throw new TypeError(`meteor-rpc: ${message}`);
@@ -77,7 +124,9 @@ function toRouter(state: ModuleState): RouterRecord {
         ? toRouter(entry.state)
         : (Object.freeze({ type: entry.kind }) as Definition);
   }
-  return Object.freeze(router);
+  const frozen = Object.freeze(router);
+  if (state.prefix !== undefined) routerStates.set(frozen, state);
+  return frozen;
 }
 
 function builder(state: ModuleState): ModuleBuilder<any, any> {
@@ -158,8 +207,10 @@ function builder(state: ModuleState): ModuleBuilder<any, any> {
       const existing = builtRouters.get(state);
       if (existing) return existing;
       if (Meteor.isServer) registerModule(state);
+      recordSubmodulePaths(state, []);
       const router = toRouter(state);
       builtRouters.set(state, router);
+      rootRouters.add(router);
       return router;
     },
     buildSubmodule() {

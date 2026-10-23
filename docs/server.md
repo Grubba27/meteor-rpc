@@ -10,6 +10,7 @@ Everything on this page comes from `meteor-rpc/server` (also re-exported by `met
 - [Hooks](#hooks)
 - [Rate limits](#rate-limits)
 - [Names](#names)
+- [Calling other modules from the server](#calling-other-modules-from-the-server)
 - [How a call runs](#how-a-call-runs)
 
 ## Modules
@@ -201,6 +202,48 @@ createModule()
   submodules.
 - **Checked twice.** TypeScript reports these mistakes as you type, and `addMethod` & co. throw at
   runtime.
+
+## Calling other modules from the server
+
+To call a method of another module from server code, for example from a resolver, use
+`createCaller`:
+
+```ts
+import { Meteor } from "meteor/meteor";
+import { createCaller, createModule } from "meteor-rpc/server";
+import { z } from "zod";
+import { Tasks } from "/imports/api/tasks";
+
+export const users = createModule("users")
+  .addMethod("isAdmin", z.object({ id: z.string() }), async ({ id }) => id === "admin")
+  .buildSubmodule();
+
+export const tasks = createModule("tasks")
+  .addMethod("clear", z.void(), async (_input, { userId }) => {
+    const isAdmin = await createCaller(users).isAdmin({ id: userId ?? "" });
+    if (!isAdmin) throw new Meteor.Error("not-authorized");
+    return Tasks.removeAsync({});
+  })
+  .buildSubmodule();
+```
+
+- **Same pipeline.** Calls go through `Meteor.callAsync`, so they're validated and run the
+  middlewares and hooks. Inside a method or publication, they run with its `userId`. Elsewhere
+  (startup code, jobs) `userId` is `null`, so a middleware requiring a login rejects them.
+  Arguments are copied with EJSON, like any Meteor call, and `rateLimit` only applies to calls
+  from clients.
+- **What to pass.** A `buildSubmodule()` result, its `.submodule`, the root router from `build()`,
+  or a part of it (`createCaller(server.users)`). A caller only has methods: subscribing needs a
+  client connection.
+- **Full names.** A submodule learns its full name (`chat.messages.send`) when the root module is
+  built, so the name is resolved on each call. A submodule added in several places can't be
+  resolved: pass a module that contains it once.
+- **Inside a module, call other modules.** TypeScript can't infer a module whose type refers to
+  itself, so don't pass the module being defined, or the root router it's part of (TS7022). For
+  the same reason, `createClient<Server>()` doesn't work there (TS2456). If two modules call each
+  other and return the results, annotate one resolver's return type.
+- **Modules that import each other.** Create the caller inside the resolver, as above, not at the
+  top of the file: with circular imports the other module may not exist yet when the file runs.
 
 ## How a call runs
 

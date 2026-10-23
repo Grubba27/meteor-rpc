@@ -17,6 +17,7 @@ configure({ asyncUtilTimeout: 5000 });
 
 const { browser } = createClient<BrowserServer>();
 const { probe } = createClient<ProbeServer>();
+const suspense = createClient<BrowserServer>({ suspense: true }).browser;
 
 class Boundary extends Component<{ children: ReactNode }, { error: unknown }> {
   state = { error: undefined as unknown };
@@ -108,6 +109,20 @@ describe("React hooks in a real browser", function () {
     const notSuspending = renderApp(<NotSuspending />);
     notSuspending.getByText("pending");
     await notSuspending.findByText("got pong");
+  });
+
+  it("useQuery suspends with { suspense: true }, and its errors reach the error boundary", async () => {
+    function Square({ n }: { n: number }) {
+      const { data } = suspense.square.useQuery(n); // `data` is a number, never undefined
+      return <p>{`square ${data.toFixed(0)}`}</p>;
+    }
+    const ok = renderApp(<Square n={7} />);
+    ok.getByText("loading"); // throws unless the first render suspended
+    await ok.findByText("square 49");
+    cleanup();
+
+    const failing = renderApp(<Square n={-1} />);
+    await failing.findByText("error: negative");
   });
 
   it("useMutation calls void-input methods without an argument; queryKey() invalidates", async () => {

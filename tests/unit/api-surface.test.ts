@@ -13,6 +13,7 @@ describe("public API surface", () => {
     expect(surface(root)).toMatchInlineSnapshot(`
       [
         "VALIDATION_ERROR",
+        "createCaller",
         "createClient",
         "createModule",
         "isMeteorError",
@@ -25,6 +26,7 @@ describe("public API surface", () => {
     expect(surface(server)).toMatchInlineSnapshot(`
       [
         "VALIDATION_ERROR",
+        "createCaller",
         "createModule",
         "isMeteorError",
         "isValidationError",

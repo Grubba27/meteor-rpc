@@ -7,13 +7,16 @@ import type { TypeScript } from "./ast.js";
 import { type FileReport, formatReport, toJson } from "./report.js";
 import { findSourceFiles, migrateFiles, writeResults } from "./run.js";
 
-export const USAGE = `Usage: meteor-rpc-migrate [--write] [--json] [--check] <paths...>
+export const USAGE = `Usage: meteor-rpc-migrate [--write] [--json] [--check] [--suspense-client] <paths...>
 
 Migrates code using meteor-rpc 1.x to 2.0. Without --write it only prints what it would change.
 
   --write   apply the changes
   --json    print the findings as JSON: [{ file, line, column, kind, message, anchor }]
   --check   exit with code 1 when something needs changing (for CI)
+  --suspense-client
+            keep useQuery() calls (they keep suspending) and create the React client with
+            { suspense: true }, instead of renaming the calls to useSuspenseQuery()
   --help    show this help
 
 Run it once, on 1.x code: a second run would turn 2.0 api.x.useQuery() calls into useSuspenseQuery().
@@ -31,6 +34,7 @@ export interface CliOptions {
   readonly json: boolean;
   readonly check: boolean;
   readonly help: boolean;
+  readonly suspenseClient: boolean;
   readonly paths: readonly string[];
 }
 
@@ -48,6 +52,7 @@ export function parseArgs(argv: readonly string[]): CliOptions | string {
   let json = false;
   let check = false;
   let help = false;
+  let suspenseClient = false;
   const paths: string[] = [];
   let onlyPaths = false;
   for (const arg of argv) {
@@ -57,9 +62,10 @@ export function parseArgs(argv: readonly string[]): CliOptions | string {
     else if (arg === "--json") json = true;
     else if (arg === "--check") check = true;
     else if (arg === "--help" || arg === "-h") help = true;
+    else if (arg === "--suspense-client") suspenseClient = true;
     else return `Unknown option ${arg}`;
   }
-  return { write, json, check, help, paths };
+  return { write, json, check, help, suspenseClient, paths };
 }
 
 /** Runs the CLI and returns the exit code: 0, 1 for --check with findings, 2 for usage errors. */
@@ -95,7 +101,9 @@ export function main(
   }
   if (sources.missing.length === options.paths.length) return 2;
 
-  const results = migrateFiles(sources.files, ts);
+  const results = migrateFiles(sources.files, ts, undefined, {
+    suspenseClient: options.suspenseClient,
+  });
   if (options.write) writeResults(results);
 
   const reports: FileReport[] = results.map(({ fileName, source, result }) => ({

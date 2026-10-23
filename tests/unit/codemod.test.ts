@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
-import { type CliIo, main } from "../../src/codemod/main";
+import { type CliIo, main, parseArgs } from "../../src/codemod/main";
 import { createProject, type Project } from "../../src/codemod/project";
 import { formatDiff } from "../../src/codemod/report";
 import { findSourceFiles, migrateFiles } from "../../src/codemod/run";
@@ -45,6 +45,77 @@ const summary = (findings: readonly Finding[]) =>
   });
 
 const CLIENT = `import { createClient } from "meteor-rpc";\nexport const api = createClient<Server>();\n`;
+
+describe("--suspense-client (§8)", () => {
+  const runSuspense = (source: string) =>
+    transform(FILE, source, ts, memoryProject(), { suspenseClient: true });
+
+  it("keeps useQuery, unwraps useQueryOptions and adds { suspense: true } to createClient()", () => {
+    const result = runSuspense(
+      `${CLIENT}api.a.useQuery(1);\napi.b.useQuery(1, { useQueryOptions: { retry: false } });\n`,
+    );
+    expect(result.output).toBe(
+      'import { createClient } from "meteor-rpc";\nexport const api = createClient<Server>({ suspense: true });\napi.a.useQuery(1);\napi.b.useQuery(1, { retry: false });\n',
+    );
+    expect(summary(result.changes)).toEqual([
+      "2 §8 createClient() → createClient({ suspense",
+      "4 §8 api.b.useQuery()",
+    ]);
+    expect(result.manual).toEqual([]);
+  });
+
+  it("adds the option next to other client options, once", () => {
+    const withOptions = runSuspense(
+      'import { createClient } from "meteor-rpc/react";\nexport const api = createClient<Server>({ connection });\n',
+    );
+    expect(withOptions.output).toContain("createClient<Server>({ connection, suspense: true })");
+    const spread = runSuspense(
+      'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ ...options });\n',
+    );
+    expect(spread.output).toContain("createClient<S>({ ...options, suspense: true })");
+    const already =
+      'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ suspense: true });\n';
+    expect(runSuspense(already).output).toBe(already);
+    expect(runSuspense(already).changes).toEqual([]);
+    const off = runSuspense(
+      'import { createClient } from "meteor-rpc";\nconst api = createClient<S>({ suspense: false });\n',
+    );
+    expect(summary(off.manual)).toEqual(["2 §8 pass { suspense"]);
+  });
+
+  it("reports useQuery calls whose client is created outside the run", () => {
+    const files: Record<string, string> = {
+      "/app/imports/api/client.ts": CLIENT,
+      "/app/imports/ui/A.tsx": `import { api } from "/imports/api/client";\napi.a.useQuery(1, { useQueryOptions: { retry: false } });\n`,
+    };
+    const host = {
+      fileExists: (fileName: string) => fileName in files,
+      readFile: (fileName: string) => files[fileName],
+      appRoot: () => "/app",
+    };
+    const [onlyUi] = migrateFiles(["/app/imports/ui/A.tsx"], ts, host, { suspenseClient: true });
+    expect(onlyUi?.result.output).toContain("api.a.useQuery(1, { retry: false })");
+    expect(summary(onlyUi?.result.manual ?? [])).toEqual([
+      "2 §8 useQuery() keeps suspending only if the client is created with { suspense",
+    ]);
+    const both = migrateFiles(Object.keys(files), ts, host, { suspenseClient: true });
+    expect(both.flatMap((file) => file.result.manual)).toEqual([]);
+    expect(both[0]?.result.output).toContain("createClient<Server>({ suspense: true })");
+  });
+
+  it("leaves the client without hooks alone", () => {
+    const source =
+      'import { createClient } from "meteor-rpc/client";\nconst api = createClient<S>();\n';
+    expect(runSuspense(source).output).toBe(source);
+  });
+
+  it("is a CLI flag", () => {
+    expect(parseArgs(["--suspense-client", "imports"])).toMatchObject({
+      suspenseClient: true,
+      paths: ["imports"],
+    });
+  });
+});
 
 describe("useQuery → useSuspenseQuery (§8)", () => {
   it("renames calls on the client and unwraps useQueryOptions", () => {

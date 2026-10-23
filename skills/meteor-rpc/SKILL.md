@@ -76,6 +76,9 @@ As the API grows, put each feature module in its own file (`templates/module.ts`
 - **Middlewares and hooks take ONE context object.** Middlewares run for methods *and*
   publications, root module first. Hooks: `onBeforeResolve`, `onAfterResolve` (`result`),
   `onErrorResolve` (`error`, re-thrown afterwards).
+- **Calling another module from server code**: `await createCaller(usersModule).getUser(input)`
+  (`meteor-rpc/server`). It runs the full pipeline with the caller's `userId`. Never
+  `createClient<Server>()` inside a module: it makes `Server` circular.
 - **Names.** No dots, unique per module, not reserved: `subscribe`, `collection`, `collections`,
   `queryKey`, `queryOptions`, `mutationOptions`, `use` + uppercase letter, `$…`, `then`, `catch`,
   `finally`, `toJSON`, `toString`, `valueOf`, `prototype`, `constructor`.
@@ -91,6 +94,8 @@ export const api = createClient<Server>();
 ```
 
 Outside components: `await api.tasks.add({ listId, title })` returns the result or throws.
+If the app's client is `createClient<Server>({ suspense: true })`, its `useQuery` suspends like
+`useSuspenseQuery` (and takes the same options).
 
 ## 4. React
 

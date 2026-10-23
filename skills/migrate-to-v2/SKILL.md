@@ -55,6 +55,10 @@ npx -y -p typescript@5.9 -p meteor-rpc@2 meteor-rpc-migrate --json imports clien
 - It changes: `api.x.useQuery(input, { useQueryOptions: o })` → `api.x.useSuspenseQuery(input, o)`,
   `(raw, parsed) => …` hooks and middlewares → `({ raw, parsed }) => …`, and
   `"meteor/grubba:rpc"` imports → `"meteor-rpc"`. Review the result with `git diff`.
+- **Keeping `useQuery` (fewer changes).** Add `--suspense-client` to both runs: it keeps the
+  `useQuery` calls (only unwrapping `{ useQueryOptions }`) and creates the React client with
+  `{ suspense: true }`, so they keep suspending like 1.x. Ask the user if you can't tell which they
+  prefer: the renamed `useSuspenseQuery()` reads clearer, `--suspense-client` touches less code.
 
 ## 4. Fix the manual items
 
@@ -65,7 +69,7 @@ Fix every `"manual"` item. The usual fixes:
 | `createMethod` / `createQuery` / `createMutation` removed | Move it into a module: `createModule().addMethod(name, schema, resolver, config)` (§11) |
 | `createPublication` / `createRealtimeQuery` removed | `addPublication`. On the client, use `api.x.usePublication(input)`, or `api.x.subscribe(input)` and `api.x.collection(input)` without React (§9) |
 | `createSharedRealtimeQuery` removed, or a shared publication returns an array | `addSharedPublication(name, schema, (input) => ({ rooms: Rooms.find(), users: Users.find() }))`. Pick a key per cursor, then update the client: `data.rooms`, `data.users` (§10) |
-| `createSafeCaller` removed | `const api = createClient<Server>(); await api.name(args)` |
+| `createSafeCaller` removed | `const api = createClient<Server>(); await api.name(args)`. In server code inside a module, `await createCaller(module).name(args)` (§13) |
 | `ReturnMethod`, `ReturnSubscription`, `Config`, `SubscriptionCallbacks` | `MethodDefinition`, `PublicationDefinition`, `MethodConfig` / `PublicationConfig`, `SubscribeCallbacks` |
 | `addBeforeResolveHook` / `addAfterResolveHook` / `addErrorResolveHook` | Move the hook into the method's `config.hooks`, or use `addMiddlewares`. Take one context: `({ raw, parsed, result, error })` (§5) |
 | `setResolver`, `expect<T>()`, `returns<T>()` | Pass the resolver to `addMethod`. Drop `expect` / `returns`; annotate the resolver's return type if needed (§11) |
@@ -82,8 +86,9 @@ The codemod can't see these. Search for them yourself:
   the root runs first. Check any middleware that depends on another one having run.
 - **Publications now run middlewares, hooks and `rateLimit` (§6).** A middleware written for
   methods may need `if (ctx.type === "method")`.
-- **Calling methods on the server (§13).** `server.foo()` on the object returned by `build()` no
-  longer works. Use `createClient<Server>()` from `meteor-rpc/client` on the server.
+- **Calling methods on the server (§13).** `server.foo()` and `someModule.submodule.foo()` (1.x
+  method objects) no longer work. Use `createCaller(someModule).foo()` from `meteor-rpc/server`,
+  not `createClient<Server>()`, which makes `Server` circular inside its own modules.
 - **Client collections (§9).** Code that opened `new Mongo.Collection("<publication name>")` on
   the client to read a publication's documents must use the `collection` returned by
   `usePublication`, or `api.x.collection(input)` (`api.x.collections(input)` for shared
@@ -126,8 +131,9 @@ Report:
 - Errors are always thrown, including after `onErrorResolve`. A `Meteor.Error` reaches the
   client unchanged. Any other error arrives as "Internal server error". Invalid input throws
   `Meteor.Error("validation-error")` with the issues in `details`.
-- `api.x.useQuery()` no longer suspends. The codemod turned 1.x calls into `useSuspenseQuery()`,
-  which still needs a `<Suspense>` boundary. The new `useQuery()` doesn't.
+- `api.x.useQuery()` no longer suspends, unless the client is created with `{ suspense: true }`.
+  The codemod turned 1.x calls into `useSuspenseQuery()` (or kept them with `--suspense-client`),
+  which still needs a `<Suspense>` boundary. The default `useQuery()` doesn't.
 - Shared publications return `{ key: cursor }`. Each key gets its own client collection, and
   `usePublication` returns `{ data: { key: [...] }, collections }`.
 - Some names are reserved (see §12). Registration happens in `build()`, so a module that is

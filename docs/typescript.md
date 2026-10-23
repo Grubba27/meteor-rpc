@@ -43,13 +43,15 @@ Keep `import type`, so the server module (and its dependencies) never reaches th
 From `meteor-rpc/server`:
 
 - **Definitions:** `MethodDefinition`, `PublicationDefinition`, `Router`, `Submodule`, `ModuleBuilder`.
+- **Server-side calls:** `Caller` (what `createCaller` returns).
 - **Contexts:** `MethodContext`, `PublicationContext`, `MiddlewareContext`, `Middleware`, `Hooks`.
 - **Meteor objects:** `MethodInvocation`, `Subscription`, `ConnectionInfo`.
 - **Schemas:** `InferInput`, `InferOutput`, `StandardSchemaV1`.
 
 From `meteor-rpc/client` and `meteor-rpc/react`:
 
-- `Client`, `ReactClient`, `MethodCaller`, `ClientCollection`, `ValidationIssue`, `MethodQueryKey`.
+- `Client`, `ReactClient`, `MethodCaller`, `ClientCollection`, `ValidationIssue`, `MethodQueryKey`, `QueryData`.
+- With `{ suspense: true }`: `SuspenseReactClient`, `SuspenseReactMethodClient`. The options type is `ReactClientOptions`. Pass `suspense` as a literal `true` or `false` to get one client type; a `boolean` gives the union of both.
 
 Annotating a client explicitly:
 

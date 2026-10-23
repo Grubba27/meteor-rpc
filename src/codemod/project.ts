@@ -66,6 +66,8 @@ export interface ClientBindings {
   readonly locals: ReadonlySet<string>;
   /** Namespace local name -> its export names that are clients. */
   readonly namespaces: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Imported client (local or namespace name) -> the file it's imported from. */
+  readonly origins: ReadonlyMap<string, string>;
 }
 
 // Local name standing for `export default createClient<Server>()`. Not a valid identifier.
@@ -245,15 +247,22 @@ export function clientBindings(
   facts: ModuleFacts,
 ): ClientBindings {
   const locals = new Set(facts.clientLocals);
+  const origins = new Map<string, string>();
   for (const [local, imported] of facts.imports) {
     const target = project.resolve(fileName, imported.specifier);
-    if (target && project.clientExports(target).has(imported.imported)) locals.add(local);
+    if (target && project.clientExports(target).has(imported.imported)) {
+      locals.add(local);
+      origins.set(local, target);
+    }
   }
   const namespaces = new Map<string, ReadonlySet<string>>();
   for (const [local, specifier] of facts.namespaceImports) {
     const target = project.resolve(fileName, specifier);
     const names = target ? project.clientExports(target) : EMPTY;
-    if (names.size > 0) namespaces.set(local, names);
+    if (names.size > 0) {
+      namespaces.set(local, names);
+      if (target) origins.set(local, target);
+    }
   }
-  return { locals, namespaces };
+  return { locals, namespaces, origins };
 }
