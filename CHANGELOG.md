@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The project follows
 [semver](https://semver.org); see [CONTRIBUTING.md › Versioning](./CONTRIBUTING.md#versioning).
 
-## 2.0.0 (unreleased)
+## 2.0.0 (2026-11-03)
 
 A rewrite that makes meteor-rpc type-check everywhere, work with any validator, and fixes the
 runtime bugs of 1.x. Upgrade guide: [MIGRATION.md](./MIGRATION.md). There's a codemod
