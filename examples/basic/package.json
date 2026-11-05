@@ -1,0 +1,43 @@
+{
+  "name": "meteor-rpc-example-basic",
+  "private": true,
+  "description": "Example Meteor 3 + React app for meteor-rpc. Also the package's integration test suite.",
+  "scripts": {
+    "start": "meteor run",
+    "test": "TEST_CLIENT=0 meteor test --once --driver-package meteortesting:mocha",
+    "test:browser": "TEST_BROWSER_DRIVER=playwright meteor test --once --driver-package meteortesting:mocha",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/runtime": "7.29.10",
+    "@tanstack/react-query": "5.104.3",
+    "meteor-node-stubs": "1.2.30",
+    "meteor-rpc": "file:../../meteor-rpc.tgz",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "valibot": "1.5.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/meteor": "2.9.11",
+    "@types/mocha": "8.2.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "playwright": "1.63.0",
+    "typescript": "7.0.2"
+  },
+  "meteor": {
+    "mainModule": {
+      "client": "client/main.tsx",
+      "server": "server/main.ts"
+    },
+    "testModule": {
+      "client": "tests/client.ts",
+      "server": "tests/server.ts"
+    },
+    "modern": true
+  }
+}

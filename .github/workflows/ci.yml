@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main, v2]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Lint, typecheck, tests, build (Node ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:types
+      - run: npm run build
+
+  consumer:
+    # Packs the library and type-checks a fixture app against it for every Meteor type
+    # provider, TypeScript 5.9/7, zod/valibot/arktype, @types/react 18/19 (scripts/consumer-check.mjs),
+    # then type-checks the documentation's code blocks (scripts/docs-snippets.mjs).
+    name: Consumer type-check matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      # One cache for the root install, the consumer projects' packages and the pinned
+      # Meteor declarations; the script pins every version, so its hash is the key.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.npm
+            ${{ runner.temp }}/meteor-rpc-consumer-check/cache
+          key: consumer-${{ runner.os }}-${{ hashFiles('package-lock.json', 'scripts/consumer-check.mjs') }}
+          restore-keys: consumer-${{ runner.os }}-
+      - run: npm ci
+      - run: npm run test:consumer
+        env:
+          CONSUMER_CHECK_DIR: ${{ runner.temp }}/meteor-rpc-consumer-check
+      # The ```ts/```tsx blocks of README.md and docs/*.md, against the same build.
+      - run: node scripts/docs-snippets.mjs --skip-build
+        env:
+          DOCS_SNIPPETS_DIR: ${{ runner.temp }}/meteor-rpc-docs-snippets
+
+  meteor:
+    # Real Meteor app (examples/basic) running its Mocha suite against the packed tarball:
+    # server tests over real DDP, then the React hooks in headless Chromium (Playwright).
+    name: Meteor integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Read the example app's Meteor release
+        id: meteor
+        run: echo "release=$(sed 's/^METEOR@//' examples/basic/.meteor/release)" >> "$GITHUB_OUTPUT"
+      - uses: meteorengineer/setup-meteor@5c24ea96e0e0d1faa1ee1d010740be0ff30a3527 # v3.0.1
+        with:
+          meteor-release: ${{ steps.meteor.outputs.release }}
+      # Playwright's headless Chromium; the version follows examples/basic/package.json.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('examples/basic/package.json') }}
+      - run: npm ci
+      - run: npm run test:meteor -- --client

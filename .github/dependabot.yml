@@ -1,0 +1,54 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/examples/basic"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # Deliberately pinned to the lowest zod 3 release with Standard Schema support.
+      - dependency-name: "zod3"
+      # The example app consumes the packed tarball (file:../../meteor-rpc.tgz).
+      - dependency-name: "meteor-rpc"
+      # Types for the oldest supported Node major (engines: node >= 20 / CI on 22).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Libraries users bring themselves (peer and peer-like dependencies). Updates here can
+      # change the public types, so they get their own PR.
+      peer-ish:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@tanstack/*"
+          - "zod"
+          - "valibot"
+          - "arktype"
+          - "@types/meteor"
+          - "meteor-node-stubs"
+      # Everything else: compiler, linter, test runner, types for tooling.
+      dev-tooling:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
