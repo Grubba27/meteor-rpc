@@ -364,10 +364,10 @@ async function checkDoc(markdownFile, prelude) {
     snippet.errors = [];
   }
 
-  const tsc = path.join(projectDir, "node_modules", "typescript", "bin", "tsc");
+  // Not tsc itself: it skips type checking when any block has a syntax error.
   const result = await run(
     process.execPath,
-    [tsc, "-p", "tsconfig.json", "--noEmit", "--pretty", "false"],
+    [path.join(repoRoot, "scripts", "type-check.mjs")],
     appDir,
   );
   const other = [];

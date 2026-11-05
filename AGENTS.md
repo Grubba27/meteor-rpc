@@ -29,7 +29,7 @@ runtime), on Meteor 3.0+.
 | `tests/unit/` | vitest against `tests/fakes/` (in-memory Meteor: DDP-like wire, merge box, Tracker, minimongo-ish stores). |
 | `tests/types/` | Type-level contract (`expectTypeOf`, `@ts-expect-error`). |
 | `examples/basic/` | Real Meteor 3 app consuming the packed tarball; its tests are `npm run test:meteor`. |
-| `scripts/` | `consumer-check.mjs` (type-checks a packed consumer against every Meteor type provider, TS 5.9/7, zod/valibot/arktype, React 18/19 types, strict tsconfigs), `meteor-test.mjs` (real Meteor; `--client` adds the React hooks in headless Chromium), `docs-snippets.mjs` (type-checks every ts/tsx block of README.md and docs/), `mark-esm.mjs` (build step: marks `dist/esm` as ES modules). |
+| `scripts/` | `consumer-check.mjs` (type-checks a packed consumer against every Meteor type provider, TS 5.9/7, zod/valibot/arktype, React 18/19 types, strict tsconfigs), `meteor-test.mjs` (real Meteor; `--client` adds the React hooks in headless Chromium), `docs-snippets.mjs` (type-checks every ts/tsx block of README.md and docs/, plus its own `docs-snippets/self-test.md`), `type-check.mjs` (tsc for docs-snippets, except one block's syntax errors don't hide the other blocks' type errors), `mark-esm.mjs` (build step: marks `dist/esm` as ES modules). |
 | `docs/`, `README.md`, `MIGRATION.md`, `CHANGELOG.md`, `CONTRIBUTING.md` | User and contributor docs. |
 | `skills/migrate-to-v2/` | Agent skill shipped in the npm package, for migrating consumer apps. |
 
