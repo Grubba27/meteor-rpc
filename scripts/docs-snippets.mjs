@@ -2,7 +2,8 @@
 // Type-checks the ```ts and ```tsx blocks of README.md and docs/*.md against the packed library,
 // so the documentation's examples keep compiling.
 //
-//   node scripts/docs-snippets.mjs                  README.md and docs/*.md
+//   node scripts/docs-snippets.mjs                  README.md, docs/*.md and the self-test page
+//                                                   scripts/docs-snippets/self-test.md
 //   node scripts/docs-snippets.mjs docs/react.md    only these Markdown files
 //   node scripts/docs-snippets.mjs --skip-build     reuse dist/ (still packs)
 //
@@ -19,9 +20,12 @@
 //   `createModule()` followed by the fragment.
 // - A one-line `.addMethod(name, schema, resolver, config?)` signature is skipped, and so is a
 //   block preceded by the line `<!-- docs-snippets: skip -->`.
+// - A block preceded by the line `<!-- docs-snippets: expect-error TS2684 -->` is wrong on purpose:
+//   it must fail with exactly the listed error codes (space-separated).
 //
 // A block fails on any TypeScript error in its file (strict mode, as in Meteor's TypeScript
-// skeleton). Errors are reported at their line in the Markdown file. Exits non-zero on any failure.
+// skeleton) that it doesn't expect. Errors are reported at their line in the Markdown file. Exits
+// non-zero on any failure.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -73,6 +77,7 @@ const COMPILER_OPTIONS = {
 const LANGUAGES = new Set(["ts", "tsx", "typescript"]);
 const FENCE = /^(\s*)(`{3,}|~{3,})\s*([\w-]*)/;
 const SKIP_MARKER = /^\s*<!--\s*docs-snippets:\s*skip\b/;
+const EXPECT_ERROR_MARKER = /^\s*<!--\s*docs-snippets:\s*expect-error((?:\s+TS\d+)+)\b/;
 const PATH_COMMENT = /^\/\/\s*((?:[\w.-]+\/)*[\w.-]+\.tsx?)(?=\s|$)/;
 const SIGNATURE = /^\.[\w.]+\(.*(?:\w\?|…).*\)$/;
 const ERROR_LINE =
@@ -168,12 +173,14 @@ function extractSnippets(markdownFile) {
         .slice(0, i)
         .reverse()
         .find((line) => line.trim() !== "");
+      const expectError = previous === undefined ? null : EXPECT_ERROR_MARKER.exec(previous);
       snippets.push({
         source,
         line: i + 2,
         language: language === "tsx" ? "tsx" : "ts",
         code,
         skip: previous !== undefined && SKIP_MARKER.test(previous),
+        expected: expectError ? expectError[1].trim().split(/\s+/).sort() : [],
       });
     }
     i = end;
@@ -357,10 +364,10 @@ async function checkDoc(markdownFile, prelude) {
     snippet.errors = [];
   }
 
-  const tsc = path.join(projectDir, "node_modules", "typescript", "bin", "tsc");
+  // Not tsc itself: it skips type checking when any block has a syntax error.
   const result = await run(
     process.execPath,
-    [tsc, "-p", "tsconfig.json", "--noEmit", "--pretty", "false"],
+    [path.join(repoRoot, "scripts", "type-check.mjs")],
     appDir,
   );
   const other = [];
@@ -381,7 +388,10 @@ async function checkDoc(markdownFile, prelude) {
     }
     const codeLine = Number(match.groups.line) - 1 - snippet.header.length;
     const at = codeLine < 0 ? snippet.line - 1 : snippet.line + codeLine;
-    snippet.errors.push(`${snippet.source}:${at}:${match.groups.col} ${detail}`);
+    snippet.errors.push({
+      code: match.groups.code,
+      text: `${snippet.source}:${at}:${match.groups.col} ${detail}`,
+    });
   }
   if (result.code !== 0 && other.length === 0 && snippets.every((s) => !s.errors?.length)) {
     other.push(result.output.trim());
@@ -399,15 +409,16 @@ function defaultDocs() {
     .filter((file) => file.endsWith(".md"))
     .sort()
     .map((file) => path.join(repoRoot, "docs", file));
-  return [path.join(repoRoot, "README.md"), ...docs];
+  return [path.join(repoRoot, "README.md"), ...docs, path.join(fixtureRoot, "self-test.md")];
 }
 
 function describe(snippet) {
   if (snippet.status === "skip") return `skipped (${snippet.reason})`;
-  if (snippet.kind === "file") return snippet.file;
+  const expects = snippet.expected.length > 0 ? ` (expects ${snippet.expected.join(" ")})` : "";
+  if (snippet.kind === "file") return `${snippet.file}${expects}`;
   const firstLine = snippet.code.trim().split("\n", 1)[0];
   const preview = firstLine.length > 50 ? `${firstLine.slice(0, 49)}…` : firstLine;
-  return `fragment "${preview}"${snippet.imports.length ? ` + prelude: ${snippet.imports.join(", ")}` : ""}`;
+  return `fragment "${preview}"${snippet.imports.length ? ` + prelude: ${snippet.imports.join(", ")}` : ""}${expects}`;
 }
 
 async function main() {
@@ -438,14 +449,25 @@ async function main() {
   for (const { source, appDir, snippets, other } of results) {
     console.log(`${source} (${path.relative(workDir, appDir)})`);
     for (const snippet of snippets) {
+      const codes = [...new Set((snippet.errors ?? []).map((error) => error.code))].sort();
       const status =
-        snippet.status === "skip" ? "skip" : snippet.errors.length > 0 ? "FAIL" : "ok  ";
+        snippet.status === "skip"
+          ? "skip"
+          : codes.join(" ") === snippet.expected.join(" ")
+            ? "ok  "
+            : "FAIL";
       if (status === "skip") skipped++;
       else checked++;
       if (status === "FAIL") failed++;
       console.log(`  ${status} ${source}:${snippet.line} ${describe(snippet)}`);
-      for (const error of snippet.errors ?? [])
-        console.log(`         ${error.replaceAll("\n", "\n         ")}`);
+      if (status !== "FAIL") continue;
+      if (snippet.expected.length > 0) {
+        console.log(
+          `         expected ${snippet.expected.join(" ")}, got ${codes.join(" ") || "none"}`,
+        );
+      }
+      for (const error of snippet.errors)
+        console.log(`         ${error.text.replaceAll("\n", "\n         ")}`);
     }
     if (other.length > 0) {
       fixtureFailures++;
@@ -454,7 +476,7 @@ async function main() {
     }
   }
   console.log(
-    `\n${checked - failed}/${checked} snippets compile, ${skipped} skipped, in ${((Date.now() - started) / 1000).toFixed(0)}s`,
+    `\n${checked - failed}/${checked} snippets ok, ${skipped} skipped, in ${((Date.now() - started) / 1000).toFixed(0)}s`,
   );
   if (failed + fixtureFailures > 0) process.exitCode = 1;
 }
